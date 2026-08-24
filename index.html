@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07513f">
+<title>ملف الإنجاز المهني</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Tahoma,Arial,sans-serif;background:#f7f0df;color:#063f34}
+button{font:inherit}
+.screen{min-height:100vh}
+#cover{display:flex;align-items:center;justify-content:center;background:#f7f0df}
+.cover-wrap{position:relative;width:min(100%,1080px);margin:auto}
+.cover-img,.inner-img{display:block;width:100%;height:auto}
+.enter-btn{position:absolute;left:50%;transform:translateX(-50%);bottom:4.5%;border:2px solid #c79b3b;background:#07513f;color:#fff;border-radius:999px;padding:13px 24px;font-weight:700;box-shadow:0 6px 20px #0002;cursor:pointer}
+#portfolio{display:none;min-height:100vh;background:#f7f0df}
+.inner-wrap{position:relative;width:min(100%,1080px);margin:auto}
+.home-btn{position:fixed;z-index:10;left:14px;top:calc(14px + env(safe-area-inset-top));width:48px;height:48px;border-radius:50%;border:2px solid #c79b3b;background:#07513f;color:#fff;font-size:24px;box-shadow:0 4px 14px #0002;cursor:pointer}
+.sections{width:min(94%,1000px);margin:-2px auto 50px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px}
+.card{background:#fffaf0;border:1px solid #d8bd83;border-radius:18px;padding:16px 10px;min-height:88px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:700;box-shadow:0 3px 12px #00000012;cursor:pointer}
+.panel{display:none;position:fixed;inset:0;z-index:30;background:#f8f1e3;overflow:auto;padding:calc(18px + env(safe-area-inset-top)) 16px 40px}
+.panel.open{display:block}.panel-box{max-width:850px;margin:auto}
+.panel-head{display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid #d8bd83;padding-bottom:12px}
+.back{border:0;border-radius:12px;background:#07513f;color:#fff;padding:10px 16px;cursor:pointer}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+.tool{border:1px solid #c79b3b;background:#fffaf0;border-radius:12px;padding:10px 12px}
+.note{background:#fff;border:1px dashed #c79b3b;border-radius:14px;padding:14px;line-height:1.8}
+@media(min-width:760px){.sections{grid-template-columns:repeat(4,minmax(0,1fr))}.card{min-height:105px}}
+</style>
+</head>
+<body>
+<section id="cover" class="screen">
+  <div class="cover-wrap">
+    <img class="cover-img" src="portfolio-cover-background-1080x1920.jpg" alt="غلاف ملف الإنجاز">
+    <button class="enter-btn" onclick="enterPortfolio()">الدخول إلى ملف الإنجاز</button>
+  </div>
+</section>
+
+<section id="portfolio">
+  <button class="home-btn" onclick="showCover()" aria-label="العودة للغلاف">⌂</button>
+  <div class="inner-wrap">
+    <img class="inner-img" src="portfolio-inner-background-1080x1920.jpg" alt="الواجهة الداخلية">
+  </div>
+  <div class="sections" id="sections"></div>
+</section>
+
+<div id="panel" class="panel">
+  <div class="panel-box">
+    <div class="panel-head">
+      <h2 id="panelTitle"></h2>
+      <button class="back" onclick="closePanel()">رجوع</button>
+    </div>
+    <div class="tools">
+      <button class="tool">＋ إضافة</button>
+      <button class="tool">✎ تعديل</button>
+      <button class="tool">🗑 حذف</button>
+      <button class="tool">⬆ رفع ملف</button>
+      <button class="tool">🖼 صور</button>
+      <button class="tool">🎬 فيديو</button>
+    </div>
+    <div class="note" id="panelInfo"></div>
+  </div>
+</div>
+
+<script>
+const data=[
+["البيانات الشخصية","المعلومات والبيانات الشخصية للمعلمة، مع إمكانية تحديثها."],
+["السيرة الذاتية","المؤهلات، الخبرات، الدورات، المهارات والإنجازات، مع رفع PDF وWord وPowerPoint داخل مجلدات."],
+["الرؤية والرسالة","الرؤية والرسالة المهنية والتربوية."],
+["الأهداف","الأهداف العامة والمهنية والتعليمية."],
+["الخطة السنوية","الخطة السنوية، الجداول، التنفيذ والمتابعة والشواهد."],
+["الوحدات التعليمية","وحدات قابلة للإضافة والحذف وتغيير الاسم والترتيب؛ وتشمل الخطط والأنشطة والاستراتيجيات والصور والشواهد والفيديوهات والتقرير الختامي."],
+["التحضير","تحضير الدروس واللقاءات والأنشطة اليومية والأسبوعية."],
+["الاستراتيجيات","استراتيجيات التعليم والتعلم وتطبيقاتها وشواهدها."],
+["الوسائل التعليمية","الوسائل والأدوات التعليمية والصور والفيديوهات والملفات."],
+["إنجازات الأطفال","أعمال الأطفال ومشاركاتهم وإنجازاتهم، والخطط العلاجية للمشكلات السلوكية وطرق العلاج وأسماء الأطفال، والخطط الإثرائية وطرق تقديمها وأسماء الأطفال، وبرنامج الخوارزمي، وبرنامج بناء مستويات التفكير العليا: المنطقي والناقد والإبداعي."],
+["ملاحظات الأطفال","ملاحظات ومتابعة تقدم الأطفال والسجلات المرتبطة بها."],
+["الأنشطة","الأنشطة الصفية واللاصفية وملفات التوثيق."],
+["المناسبات","المناسبات والفعاليات والتوثيق بالصور والفيديو والتقارير."],
+["المبادرات","المبادرات التعليمية والتربوية ومراحل التنفيذ وقياس الأثر."],
+["الشراكة المجتمعية","برامج الشراكة والتعاون المجتمعي والشواهد والتقارير."],
+["التوجيه الصحي","قسم مستقل يشمل مجلدات قابلة للتعديل والترتيب: الخطط، البرامج والمبادرات، التقارير، الصور والشواهد، البيئة المدرسية، والبيئة الصفية."],
+["تقارير التوجيه الصحي","التقارير الدورية والختامية والنماذج والمرفقات الصحية."],
+["المسابقات الصحية","المسابقات والبرامج الصحية ونتائجها وشواهدها."],
+["الدورات التدريبية","الدورات وورش العمل وساعات التدريب والملفات المرتبطة بها."],
+["الشهادات","الشهادات المهنية وشهادات الحضور والشكر والتقدير."],
+["الشواهد والصور","رفع وتنظيم الصور والفيديوهات وPDF وWord وPowerPoint وبقية الشواهد."],
+["ملاحظات الإدارة والمشرفات","ملاحظات المديرة والوكيلة والمشرفات؛ مع مساحة للتوقيع والختم على الملفات عند ربط قاعدة البيانات والصلاحيات."],
+["مشاركة الأسرة","إضافة ملاحظات الأسرة المتعلقة بالتعليم والتوجيه الصحي ومتابعة تقدم الأبناء، مع تجهيز الربط والمشاركة لاحقًا."],
+["التقارير الختامية","التقارير الختامية للأعمال والوحدات والبرامج والأنشطة والتوجيه الصحي."]
+];
+
+const sections=document.getElementById("sections");
+data.forEach((x,i)=>{
+ const b=document.createElement("button");
+ b.className="card"; b.textContent=(i+1)+". "+x[0];
+ b.onclick=()=>openPanel(i); sections.appendChild(b);
+});
+function enterPortfolio(){document.getElementById("cover").style.display="none";document.getElementById("portfolio").style.display="block";scrollTo(0,0)}
+function showCover(){document.getElementById("portfolio").style.display="none";document.getElementById("cover").style.display="flex";scrollTo(0,0)}
+function openPanel(i){document.getElementById("panelTitle").textContent=data[i][0];document.getElementById("panelInfo").textContent=data[i][1];document.getElementById("panel").classList.add("open")}
+function closePanel(){document.getElementById("panel").classList.remove("open")}
+</script>
+</body>
+</html>
