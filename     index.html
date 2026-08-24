@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#075b45">
+<title>ملف الإنجاز المهني</title>
+<style>
+:root{
+ --green:#075b45; --green2:#0d6a54; --gold:#b88a32;
+ --cream:#f8f1e5; --card:#fffaf2; --line:#e3c996; --text:#173f35;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--cream);color:var(--text);
+font-family:"Geeza Pro","Arial","Tahoma",sans-serif}
+button{font:inherit}
+body.cover-mode{position:fixed;inset:0;width:100%;height:100%;overflow:hidden}
+
+/* الغلاف: ثابت تمامًا ولا يتحرك */
+#cover{
+ position:fixed; inset:0; z-index:1000; overflow:hidden; background:var(--cream);
+}
+.cover-bg{
+ position:absolute; inset:0;
+ background-image:url("portfolio-cover-background-1080x1920.jpg");
+ background-size:cover;
+ background-position:center center;
+ background-repeat:no-repeat;
+}
+.cover-hit{
+ position:absolute; z-index:2; left:50%;
+ bottom:max(22px,calc(env(safe-area-inset-bottom) + 18px));
+ transform:translateX(-50%);
+ width:min(58vw,420px); height:76px;
+ border:0; background:transparent; cursor:pointer;
+}
+
+/* الداخلية */
+#portfolio{display:none;min-height:100dvh;background:var(--cream)}
+.inner-shell{width:min(100%,1080px);margin:auto}
+.inner-visual{width:100%;background:var(--cream);overflow:hidden}
+.inner-visual img{display:block;width:100%;height:auto}
+.home-btn{
+ position:fixed;z-index:50;left:14px;top:max(14px,env(safe-area-inset-top));
+ width:52px;height:52px;border-radius:50%;border:2px solid var(--gold);
+ background:var(--green);color:#fff;font-size:25px;box-shadow:0 5px 15px #0002;
+ display:grid;place-items:center;cursor:pointer
+}
+.heading{text-align:center;margin:24px auto 14px;color:var(--green);font-size:26px;font-weight:800}
+.heading::after{content:"";display:block;width:82px;height:2px;margin:9px auto 0;
+background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.grid{width:min(94%,1000px);margin:auto;padding-bottom:44px;display:grid;
+grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.section-card{
+ position:relative;display:grid;grid-template-columns:auto 1fr;align-items:center;gap:12px;
+ min-height:112px;padding:16px 14px;border:1px solid var(--line);border-radius:20px;
+ background:linear-gradient(180deg,#fffdf8,#fff8ee);color:var(--green);
+ box-shadow:0 5px 14px rgba(70,50,20,.08);text-align:right;cursor:pointer
+}
+.section-card:active{transform:scale(.985)}
+.icon-wrap{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;
+background:var(--green);color:#f2d58f;border:2px solid #d8b468;font-size:26px;box-shadow:0 4px 10px #0002}
+.card-copy strong{display:block;font-size:16px;line-height:1.45}
+.card-copy small{display:block;margin-top:4px;font-size:12px;color:#6c6253;line-height:1.5}
+.num{position:absolute;top:8px;left:10px;min-width:28px;height:28px;padding:0 7px;border-radius:999px;
+display:grid;place-items:center;background:#f2e4c6;border:1px solid #d4b36d;color:#6a4e1b;font-weight:800;font-size:12px}
+
+/* صفحة كل قسم */
+.panel{display:none;position:fixed;inset:0;z-index:2000;background:var(--cream);overflow:auto;
+padding:calc(18px + env(safe-area-inset-top)) 14px 34px}
+.panel.open{display:block}
+.panel-box{width:min(100%,860px);margin:auto}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+border-bottom:1px solid var(--line);padding-bottom:12px}
+.panel-head h2{margin:0;color:var(--green);font-size:23px}
+.back{border:0;border-radius:12px;background:var(--green);color:#fff;padding:10px 15px}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0}
+.action{border:1px solid var(--line);background:#fffaf2;color:var(--green);border-radius:14px;padding:11px 8px;font-weight:700}
+.placeholder{border:1px dashed #d2b77e;border-radius:16px;background:#fffaf2;padding:20px;line-height:1.9;color:#5d5547}
+
+@media(min-width:760px){
+ .grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+ .section-card{min-height:128px}
+}
+</style>
+</head>
+<body class="cover-mode">
+
+<section id="cover" aria-label="غلاف ملف الإنجاز">
+  <div class="cover-bg"></div>
+  <button class="cover-hit" onclick="enterPortfolio()" aria-label="الدخول إلى ملف الإنجاز"></button>
+</section>
+
+<section id="portfolio">
+  <button class="home-btn" onclick="showCover()" aria-label="العودة إلى الغلاف">⌂</button>
+  <main class="inner-shell">
+    <div class="inner-visual">
+      <img src="portfolio-inner-background-1080x1920.jpg" alt="الواجهة الداخلية لملف الإنجاز">
+    </div>
+    <h2 class="heading">أقسام ملف الإنجاز</h2>
+    <div class="grid"><button class="section-card" onclick="openSection('البيانات الشخصية')">
+  <span class="icon-wrap">👤</span>
+  <span class="card-copy"><strong>البيانات الشخصية</strong><small>المعلومات والبيانات الشخصية</small></span>
+  <span class="num">١</span>
+</button>
+<button class="section-card" onclick="openSection('السيرة الذاتية')">
+  <span class="icon-wrap">📄</span>
+  <span class="card-copy"><strong>السيرة الذاتية</strong><small>المؤهلات والخبرات والدورات والمهارات</small></span>
+  <span class="num">٢</span>
+</button>
+<button class="section-card" onclick="openSection('الرؤية والرسالة')">
+  <span class="icon-wrap">🌿</span>
+  <span class="card-copy"><strong>الرؤية والرسالة</strong><small>الرؤية والرسالة المهنية</small></span>
+  <span class="num">٣</span>
+</button>
+<button class="section-card" onclick="openSection('الأهداف')">
+  <span class="icon-wrap">🎯</span>
+  <span class="card-copy"><strong>الأهداف</strong><small>الأهداف المهنية والتعليمية</small></span>
+  <span class="num">٤</span>
+</button>
+<button class="section-card" onclick="openSection('الخطة السنوية')">
+  <span class="icon-wrap">🗓️</span>
+  <span class="card-copy"><strong>الخطة السنوية</strong><small>الخطة السنوية والتنفيذ والمتابعة</small></span>
+  <span class="num">٥</span>
+</button>
+<button class="section-card" onclick="openSection('الوحدات التعليمية')">
+  <span class="icon-wrap">📚</span>
+  <span class="card-copy"><strong>الوحدات التعليمية</strong><small>الوحدات والخطط والأنشطة والتقارير</small></span>
+  <span class="num">٦</span>
+</button>
+<button class="section-card" onclick="openSection('التحضير')">
+  <span class="icon-wrap">✏️</span>
+  <span class="card-copy"><strong>التحضير</strong><small>التحضير اليومي والأسبوعي</small></span>
+  <span class="num">٧</span>
+</button>
+<button class="section-card" onclick="openSection('الاستراتيجيات')">
+  <span class="icon-wrap">🧠</span>
+  <span class="card-copy"><strong>الاستراتيجيات</strong><small>استراتيجيات التعليم والتعلم</small></span>
+  <span class="num">٨</span>
+</button>
+<button class="section-card" onclick="openSection('الوسائل التعليمية')">
+  <span class="icon-wrap">🧩</span>
+  <span class="card-copy"><strong>الوسائل التعليمية</strong><small>الوسائل والأدوات التعليمية</small></span>
+  <span class="num">٩</span>
+</button>
+<button class="section-card" onclick="openSection('إنجازات الأطفال')">
+  <span class="icon-wrap">🏆</span>
+  <span class="card-copy"><strong>إنجازات الأطفال</strong><small>الأعمال والمشاريع والخطط والبرامج</small></span>
+  <span class="num">١٠</span>
+</button>
+<button class="section-card" onclick="openSection('ملاحظات الأطفال')">
+  <span class="icon-wrap">📝</span>
+  <span class="card-copy"><strong>ملاحظات الأطفال</strong><small>الملاحظات والمتابعة والتقدم</small></span>
+  <span class="num">١١</span>
+</button>
+<button class="section-card" onclick="openSection('الأنشطة')">
+  <span class="icon-wrap">🎨</span>
+  <span class="card-copy"><strong>الأنشطة</strong><small>الأنشطة الصفية واللاصفية</small></span>
+  <span class="num">١٢</span>
+</button>
+<button class="section-card" onclick="openSection('المناسبات')">
+  <span class="icon-wrap">🎉</span>
+  <span class="card-copy"><strong>المناسبات</strong><small>المناسبات والفعاليات والتوثيق</small></span>
+  <span class="num">١٣</span>
+</button>
+<button class="section-card" onclick="openSection('المبادرات')">
+  <span class="icon-wrap">💡</span>
+  <span class="card-copy"><strong>المبادرات</strong><small>المبادرات وقياس الأثر</small></span>
+  <span class="num">١٤</span>
+</button>
+<button class="section-card" onclick="openSection('الشراكة المجتمعية')">
+  <span class="icon-wrap">🤝</span>
+  <span class="card-copy"><strong>الشراكة المجتمعية</strong><small>الشراكات والتعاون المجتمعي</small></span>
+  <span class="num">١٥</span>
+</button>
+<button class="section-card" onclick="openSection('التوجيه الصحي')">
+  <span class="icon-wrap">❤️</span>
+  <span class="card-copy"><strong>التوجيه الصحي</strong><small>الخطط والبرامج والبيئة المدرسية والصفية</small></span>
+  <span class="num">١٦</span>
+</button>
+<button class="section-card" onclick="openSection('تقارير التوجيه الصحي')">
+  <span class="icon-wrap">📋</span>
+  <span class="card-copy"><strong>تقارير التوجيه الصحي</strong><small>التقارير الدورية والختامية</small></span>
+  <span class="num">١٧</span>
+</button>
+<button class="section-card" onclick="openSection('المسابقات الصحية')">
+  <span class="icon-wrap">🥇</span>
+  <span class="card-copy"><strong>المسابقات الصحية</strong><small>المسابقات والنتائج والشواهد</small></span>
+  <span class="num">١٨</span>
+</button>
+<button class="section-card" onclick="openSection('الدورات التدريبية')">
+  <span class="icon-wrap">🎓</span>
+  <span class="card-copy"><strong>الدورات التدريبية</strong><small>الدورات وورش العمل</small></span>
+  <span class="num">١٩</span>
+</button>
+<button class="section-card" onclick="openSection('الشهادات')">
+  <span class="icon-wrap">📜</span>
+  <span class="card-copy"><strong>الشهادات</strong><small>الشهادات والتكريمات</small></span>
+  <span class="num">٢٠</span>
+</button>
+<button class="section-card" onclick="openSection('الشواهد والصور')">
+  <span class="icon-wrap">🖼️</span>
+  <span class="card-copy"><strong>الشواهد والصور</strong><small>الصور والفيديوهات والوثائق</small></span>
+  <span class="num">٢١</span>
+</button>
+<button class="section-card" onclick="openSection('ملاحظات الإدارة والمشرفات')">
+  <span class="icon-wrap">✍️</span>
+  <span class="card-copy"><strong>ملاحظات الإدارة والمشرفات</strong><small>الملاحظات والتوقيع والختم والاعتماد</small></span>
+  <span class="num">٢٢</span>
+</button>
+<button class="section-card" onclick="openSection('مشاركة الأسرة')">
+  <span class="icon-wrap">👨‍👩‍👧</span>
+  <span class="card-copy"><strong>مشاركة الأسرة</strong><small>المشاركة والمتابعة والملاحظات</small></span>
+  <span class="num">٢٣</span>
+</button>
+<button class="section-card" onclick="openSection('التقارير الختامية')">
+  <span class="icon-wrap">📑</span>
+  <span class="card-copy"><strong>التقارير الختامية</strong><small>التقارير الختامية والنتائج والتوصيات</small></span>
+  <span class="num">٢٤</span>
+</button></div>
+  </main>
+</section>
+
+<div id="panel" class="panel">
+  <div class="panel-box">
+    <div class="panel-head">
+      <h2 id="panelTitle"></h2>
+      <button class="back" onclick="closePanel()">رجوع</button>
+    </div>
+    <div class="actions">
+      <button class="action">＋ إضافة</button>
+      <button class="action">✎ تعديل</button>
+      <button class="action">🗑 حذف</button>
+      <button class="action">⬆ رفع ملفات</button>
+      <button class="action">🖼 صور</button>
+      <button class="action">🎬 فيديو</button>
+    </div>
+    <div class="placeholder">هذا القسم جاهز للمرحلة التالية: ربط قاعدة البيانات، إنشاء المجلدات، رفع الصور والفيديوهات والملفات المتعددة، والتعديل والحذف والترتيب.</div>
+  </div>
+</div>
+
+<script>
+function enterPortfolio(){
+ document.getElementById("cover").style.display="none";
+ document.getElementById("portfolio").style.display="block";
+ document.body.classList.remove("cover-mode");
+ window.scrollTo(0,0);
+}
+function showCover(){
+ document.getElementById("portfolio").style.display="none";
+ document.getElementById("cover").style.display="block";
+ document.body.classList.add("cover-mode");
+ window.scrollTo(0,0);
+}
+function openSection(name){
+ document.getElementById("panelTitle").textContent=name;
+ document.getElementById("panel").classList.add("open");
+}
+function closePanel(){
+ document.getElementById("panel").classList.remove("open");
+}
+</script>
+</body>
+</html>
