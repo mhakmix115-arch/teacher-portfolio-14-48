@@ -10,7 +10,7 @@
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--cream);font-family:"Geeza Pro","Noto Naskh Arabic","Tahoma",Arial,sans-serif;color:var(--text)}button{font:inherit}
 body.cover-open{overflow:hidden}
 #cover{position:fixed;inset:0;z-index:50;width:100%;height:100dvh;overflow:hidden;background:#f8f1e5}
-.cover-image{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center top;}
+.cover-image{position:absolute;top:0;left:0;width:100%;height:auto;display:block;}
 .cover-shade{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 74%,rgba(248,241,229,.25) 86%,rgba(248,241,229,.82) 100%);pointer-events:none}
 .enter-btn{position:absolute;z-index:2;left:50%;bottom:max(34px,calc(env(safe-area-inset-bottom) + 22px));transform:translateX(-50%);min-width:280px;max-width:86vw;border:2px solid var(--gold);border-radius:999px;background:var(--green);color:white;padding:14px 28px;font-size:20px;font-weight:700;box-shadow:0 8px 22px #0002}
 #portfolio{display:none;min-height:100dvh;background:var(--cream);padding-bottom:40px}
