@@ -3,103 +3,63 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#07513f">
+<meta name="theme-color" content="#075b45">
 <title>ملف الإنجاز المهني</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Tahoma,Arial,sans-serif;background:#f7f0df;color:#063f34}
-button{font:inherit}
-.screen{min-height:100vh}
-#cover{display:flex;align-items:center;justify-content:center;background:#f7f0df}
-.cover-wrap{position:relative;width:min(100%,1080px);margin:auto}
-.cover-img,.inner-img{display:block;width:100%;height:auto}
-.enter-btn{position:absolute;left:50%;transform:translateX(-50%);bottom:4.5%;border:2px solid #c79b3b;background:#07513f;color:#fff;border-radius:999px;padding:13px 24px;font-weight:700;box-shadow:0 6px 20px #0002;cursor:pointer}
-#portfolio{display:none;min-height:100vh;background:#f7f0df}
-.inner-wrap{position:relative;width:min(100%,1080px);margin:auto}
-.home-btn{position:fixed;z-index:10;left:14px;top:calc(14px + env(safe-area-inset-top));width:48px;height:48px;border-radius:50%;border:2px solid #c79b3b;background:#07513f;color:#fff;font-size:24px;box-shadow:0 4px 14px #0002;cursor:pointer}
-.sections{width:min(94%,1000px);margin:-2px auto 50px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px}
-.card{background:#fffaf0;border:1px solid #d8bd83;border-radius:18px;padding:16px 10px;min-height:88px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:700;box-shadow:0 3px 12px #00000012;cursor:pointer}
-.panel{display:none;position:fixed;inset:0;z-index:30;background:#f8f1e3;overflow:auto;padding:calc(18px + env(safe-area-inset-top)) 16px 40px}
-.panel.open{display:block}.panel-box{max-width:850px;margin:auto}
-.panel-head{display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid #d8bd83;padding-bottom:12px}
-.back{border:0;border-radius:12px;background:#07513f;color:#fff;padding:10px 16px;cursor:pointer}
-.tools{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
-.tool{border:1px solid #c79b3b;background:#fffaf0;border-radius:12px;padding:10px 12px}
-.note{background:#fff;border:1px dashed #c79b3b;border-radius:14px;padding:14px;line-height:1.8}
-@media(min-width:760px){.sections{grid-template-columns:repeat(4,minmax(0,1fr))}.card{min-height:105px}}
+:root{--green:#075b45;--green2:#0d6a54;--gold:#c7a34b;--cream:#f8f1e5;--card:#fffaf2;--text:#173d34;--muted:#6f6558}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--cream);font-family:"Geeza Pro","Noto Naskh Arabic","Tahoma",Arial,sans-serif;color:var(--text)}button{font:inherit}
+body.cover-open{overflow:hidden}
+#cover{position:fixed;inset:0;z-index:50;background:#f7efdf;display:grid;place-items:center;overflow:hidden}
+.cover-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;display:block}
+.cover-shade{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 74%,rgba(248,241,229,.25) 86%,rgba(248,241,229,.82) 100%);pointer-events:none}
+.enter-btn{position:absolute;z-index:2;left:50%;bottom:max(34px,calc(env(safe-area-inset-bottom) + 22px));transform:translateX(-50%);min-width:280px;max-width:86vw;border:2px solid var(--gold);border-radius:999px;background:var(--green);color:white;padding:14px 28px;font-size:20px;font-weight:700;box-shadow:0 8px 22px #0002}
+#portfolio{display:none;min-height:100dvh;background:var(--cream);padding-bottom:40px}
+.home-btn{position:fixed;z-index:25;top:max(14px,env(safe-area-inset-top));left:14px;width:56px;height:56px;border-radius:50%;border:2px solid var(--gold);background:var(--green);color:#fff;font-size:27px;box-shadow:0 5px 14px #0002}
+.inner-hero{width:100%;margin:0 auto;background:var(--cream);overflow:hidden}
+.inner-img{display:block;width:100%;height:auto;max-width:1080px;margin:0 auto}
+.section-heading{width:min(94%,860px);margin:22px auto 12px;text-align:center;color:var(--green);font-size:24px;font-weight:800}.section-heading:after{content:"";display:block;width:100px;height:2px;background:var(--gold);margin:8px auto 0}
+.sections{width:min(94%,860px);margin:0 auto 42px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{border:1.5px solid #d8b96f;border-radius:22px;background:rgba(255,250,242,.97);padding:13px 11px;min-height:108px;display:flex;align-items:center;gap:10px;text-align:right;color:var(--green);box-shadow:0 5px 14px rgba(95,69,23,.08)}
+.icon{flex:0 0 45px;width:45px;height:45px;border-radius:50%;display:grid;place-items:center;background:var(--green);color:#f0d47e;border:2px solid var(--gold);font-size:21px}.copy{min-width:0}.title{font-size:16px;font-weight:800;line-height:1.4}.num{color:var(--gold);font-weight:800;margin-left:4px}.desc{display:block;color:var(--muted);font-size:11px;line-height:1.45;margin-top:4px}
+.panel{display:none;position:fixed;inset:0;z-index:60;background:var(--cream);overflow:auto;padding:max(74px,calc(env(safe-area-inset-top) + 64px)) 16px 30px}.panel.active{display:block}.panel-box{max-width:820px;margin:auto;background:var(--card);border:1.5px solid #d8b96f;border-radius:24px;padding:20px;box-shadow:0 8px 24px #0001}.back{border:0;border-radius:999px;background:var(--green);color:#fff;padding:10px 17px;font-weight:700}.panel h2{color:var(--green);margin:18px 0 6px}.panel p{color:var(--muted);line-height:1.8}.editor{width:100%;min-height:130px;border:1px solid #d8c79d;border-radius:15px;padding:12px;background:white;font:inherit;resize:vertical}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.action{border:1px solid var(--gold);border-radius:999px;background:var(--green);color:white;padding:9px 14px}.upload{display:inline-block;cursor:pointer}.upload input{display:none}.gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:15px}.gallery img,.gallery video{width:100%;border-radius:14px;border:1px solid #e1d3b0}.file-link{display:block;background:#fff;border:1px solid #e1d3b0;border-radius:12px;padding:10px;margin-top:8px;color:var(--green);text-decoration:none;overflow-wrap:anywhere}
+@media(max-width:430px){.enter-btn{min-width:250px;font-size:18px}.sections{gap:9px}.card{min-height:102px;padding:10px 8px;gap:8px}.icon{width:41px;height:41px;flex-basis:41px;font-size:19px}.title{font-size:14px}.desc{font-size:10px}.section-heading{font-size:21px}}
+@media(min-width:700px){.sections{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
 </head>
-<body>
-<section id="cover" class="screen">
-  <div class="cover-wrap">
-    <img class="cover-img" src="portfolio-cover-background-1080x1920.jpg" alt="غلاف ملف الإنجاز">
-    <button class="enter-btn" onclick="enterPortfolio()">الدخول إلى ملف الإنجاز</button>
-  </div>
+<body class="cover-open">
+<section id="cover">
+  <img class="cover-image" src="./portfolio-cover-background-1080x1920.jpg" alt="غلاف ملف الإنجاز">
+  <div class="cover-shade"></div>
+  <button class="enter-btn" type="button" onclick="openPortfolio()">الدخول إلى ملف الإنجاز</button>
 </section>
-
 <section id="portfolio">
-  <button class="home-btn" onclick="showCover()" aria-label="العودة للغلاف">⌂</button>
-  <div class="inner-wrap">
-    <img class="inner-img" src="portfolio-inner-background-1080x1920.jpg" alt="الواجهة الداخلية">
-  </div>
+  <button class="home-btn" type="button" onclick="goCover()" aria-label="العودة للغلاف">⌂</button>
+  <div class="inner-hero"><img class="inner-img" src="./portfolio-inner-background-1080x1920.jpg" alt="الواجهة الداخلية"></div>
+  <div class="section-heading">أقسام ملف الإنجاز</div>
   <div class="sections" id="sections"></div>
 </section>
-
-<div id="panel" class="panel">
-  <div class="panel-box">
-    <div class="panel-head">
-      <h2 id="panelTitle"></h2>
-      <button class="back" onclick="closePanel()">رجوع</button>
-    </div>
-    <div class="tools">
-      <button class="tool">＋ إضافة</button>
-      <button class="tool">✎ تعديل</button>
-      <button class="tool">🗑 حذف</button>
-      <button class="tool">⬆ رفع ملف</button>
-      <button class="tool">🖼 صور</button>
-      <button class="tool">🎬 فيديو</button>
-    </div>
-    <div class="note" id="panelInfo"></div>
-  </div>
-</div>
-
+<div class="panel" id="panel"><div class="panel-box">
+  <button class="back" onclick="closePanel()">← العودة للأقسام</button>
+  <h2 id="panelTitle"></h2><p id="panelDesc"></p>
+  <textarea class="editor" id="editor" placeholder="اكتبي محتوى هذا القسم هنا..."></textarea>
+  <div class="actions"><button class="action" onclick="saveText()">حفظ النص</button><label class="action upload">رفع صور / فيديو / ملفات<input id="fileInput" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onchange="addFiles(event)"></label><button class="action" onclick="clearSection()">حذف محتوى القسم</button></div>
+  <div class="gallery" id="gallery"></div><div id="fileList"></div>
+</div></div>
 <script>
-const data=[
-["البيانات الشخصية","المعلومات والبيانات الشخصية للمعلمة، مع إمكانية تحديثها."],
-["السيرة الذاتية","المؤهلات، الخبرات، الدورات، المهارات والإنجازات، مع رفع PDF وWord وPowerPoint داخل مجلدات."],
-["الرؤية والرسالة","الرؤية والرسالة المهنية والتربوية."],
-["الأهداف","الأهداف العامة والمهنية والتعليمية."],
-["الخطة السنوية","الخطة السنوية، الجداول، التنفيذ والمتابعة والشواهد."],
-["الوحدات التعليمية","وحدات قابلة للإضافة والحذف وتغيير الاسم والترتيب؛ وتشمل الخطط والأنشطة والاستراتيجيات والصور والشواهد والفيديوهات والتقرير الختامي."],
-["التحضير","تحضير الدروس واللقاءات والأنشطة اليومية والأسبوعية."],
-["الاستراتيجيات","استراتيجيات التعليم والتعلم وتطبيقاتها وشواهدها."],
-["الوسائل التعليمية","الوسائل والأدوات التعليمية والصور والفيديوهات والملفات."],
-["إنجازات الأطفال","أعمال الأطفال ومشاركاتهم وإنجازاتهم، والخطط العلاجية للمشكلات السلوكية وطرق العلاج وأسماء الأطفال، والخطط الإثرائية وطرق تقديمها وأسماء الأطفال، وبرنامج الخوارزمي، وبرنامج بناء مستويات التفكير العليا: المنطقي والناقد والإبداعي."],
-["ملاحظات الأطفال","ملاحظات ومتابعة تقدم الأطفال والسجلات المرتبطة بها."],
-["الأنشطة","الأنشطة الصفية واللاصفية وملفات التوثيق."],
-["المناسبات","المناسبات والفعاليات والتوثيق بالصور والفيديو والتقارير."],
-["المبادرات","المبادرات التعليمية والتربوية ومراحل التنفيذ وقياس الأثر."],
-["الشراكة المجتمعية","برامج الشراكة والتعاون المجتمعي والشواهد والتقارير."],
-["التوجيه الصحي","قسم مستقل يشمل مجلدات قابلة للتعديل والترتيب: الخطط، البرامج والمبادرات، التقارير، الصور والشواهد، البيئة المدرسية، والبيئة الصفية."],
-["تقارير التوجيه الصحي","التقارير الدورية والختامية والنماذج والمرفقات الصحية."],
-["المسابقات الصحية","المسابقات والبرامج الصحية ونتائجها وشواهدها."],
-["الدورات التدريبية","الدورات وورش العمل وساعات التدريب والملفات المرتبطة بها."],
-["الشهادات","الشهادات المهنية وشهادات الحضور والشكر والتقدير."],
-["الشواهد والصور","رفع وتنظيم الصور والفيديوهات وPDF وWord وPowerPoint وبقية الشواهد."],
-["ملاحظات الإدارة والمشرفات","ملاحظات المديرة والوكيلة والمشرفات؛ مع مساحة للتوقيع والختم على الملفات عند ربط قاعدة البيانات والصلاحيات."],
-["مشاركة الأسرة","إضافة ملاحظات الأسرة المتعلقة بالتعليم والتوجيه الصحي ومتابعة تقدم الأبناء، مع تجهيز الربط والمشاركة لاحقًا."],
-["التقارير الختامية","التقارير الختامية للأعمال والوحدات والبرامج والأنشطة والتوجيه الصحي."]
-];
-
-const sections=document.getElementById("sections");
-data.forEach((x,i)=>{
- const b=document.createElement("button");
- b.className="card"; b.textContent=(i+1)+". "+x[0];
- b.onclick=()=>openPanel(i); sections.appendChild(b);
-});
-function enterPortfolio(){document.getElementById("cover").style.display="none";document.getElementById("portfolio").style.display="block";scrollTo(0,0)}
-function showCover(){document.getElementById("portfolio").style.display="none";document.getElementById("cover").style.display="flex";scrollTo(0,0)}
-function openPanel(i){document.getElementById("panelTitle").textContent=data[i][0];document.getElementById("panelInfo").textContent=data[i][1];document.getElementById("panel").classList.add("open")}
-function closePanel(){document.getElementById("panel").classList.remove("open")}
+const items=[
+["👤","البيانات الشخصية","المعلومات والبيانات الشخصية"],["📄","السيرة الذاتية","المؤهلات والخبرات"],["🎯","الرؤية والرسالة","الرؤية والرسالة المهنية"],["⭐","الأهداف","الأهداف المهنية والتعليمية"],["🗓️","الخطة السنوية","الخطة والتنفيذ والمتابعة"],["📚","الوحدات التعليمية","الوحدات والتقارير الختامية"],["🧩","التحضير","تحضير الأنشطة التعليمية"],["💡","استراتيجيات التعليم","استراتيجيات وأساليب التعلم"],["🏆","إنجازات الأطفال","توثيق إنجازات الأطفال"],["📝","ملاحظات الأطفال","الملاحظات والمتابعة"],["🩺","التوجيه الصحي","تقارير وصور ومسابقات"],["📋","الاستبيانات","استبيانات الأسرة والمنسوبين"],["🪞","التقويم الذاتي","إعداد وتنفيذ التقويم الذاتي"],["👥","التقويم الخارجي","إعداد وتنفيذ التقويم الخارجي"],["📊","الأداء الوظيفي","توثيق ومتابعة الأداء"],["📁","ملفات وشواهد","رفع الملفات والشهادات"],["🎓","الدورات التدريبية","الدورات والتطوير المهني"],["📜","الشهادات","الشهادات وشواهد الإنجاز"],["🎬","الفيديوهات","مقاطع الفيديو والشواهد المرئية"],["🖼️","الصور","الصور والأنشطة"],["🤝","الشراكة المجتمعية","المبادرات والمشاركات"],["💬","ملاحظات الإدارة","ملاحظات المديرة والوكيلة والمشرفات"],["👨‍👩‍👧","ملاحظات الأسرة","ملاحظات الأسرة التعليمية والصحية"],["🌟","صورتي وشهاداتي","صور شخصية وشهادات وشواهد مهنية"]];
+const arNums=["١","٢","٣","٤","٥","٦","٧","٨","٩","١٠","١١","١٢","١٣","١٤","١٥","١٦","١٧","١٨","١٩","٢٠","٢١","٢٢","٢٣","٢٤"];
+let currentSection="";
+function renderCards(){const box=document.getElementById('sections');box.innerHTML='';items.forEach((it,i)=>{const b=document.createElement('button');b.className='card';b.type='button';b.innerHTML=`<span class="icon">${it[0]}</span><span class="copy"><span class="title"><span class="num">${arNums[i]}.</span>${it[1]}</span><span class="desc">${it[2]}</span></span>`;b.onclick=()=>openPanel(it[1],it[2]);box.appendChild(b)})}
+function openPortfolio(){document.getElementById('cover').style.display='none';document.getElementById('portfolio').style.display='block';document.body.classList.remove('cover-open');window.scrollTo(0,0)}
+function goCover(){closePanel();document.getElementById('portfolio').style.display='none';document.getElementById('cover').style.display='grid';document.body.classList.add('cover-open');window.scrollTo(0,0)}
+function openPanel(title,desc){currentSection=title;document.getElementById('panelTitle').textContent=title;document.getElementById('panelDesc').textContent=desc;document.getElementById('editor').value=localStorage.getItem('text_'+title)||'';loadFiles();document.getElementById('panel').classList.add('active')}
+function closePanel(){document.getElementById('panel').classList.remove('active')}
+function saveText(){localStorage.setItem('text_'+currentSection,document.getElementById('editor').value);alert('تم الحفظ')}
+function addFiles(e){const incoming=[...e.target.files],saved=JSON.parse(localStorage.getItem('files_'+currentSection)||'[]');let i=0;function next(){if(i>=incoming.length){e.target.value='';loadFiles();return}const f=incoming[i++],r=new FileReader();r.onload=()=>{saved.push({name:f.name,type:f.type||'application/octet-stream',data:r.result});try{localStorage.setItem('files_'+currentSection,JSON.stringify(saved));next()}catch(err){saved.pop();alert('حجم الملفات أكبر من مساحة المتصفح. احذفي بعض الملفات الكبيرة ثم أعيدي المحاولة.');e.target.value='';loadFiles()}};r.readAsDataURL(f)}next()}
+function loadFiles(){const g=document.getElementById('gallery'),l=document.getElementById('fileList');g.innerHTML='';l.innerHTML='';const saved=JSON.parse(localStorage.getItem('files_'+currentSection)||'[]');saved.forEach((x,i)=>{let el;if(x.type.startsWith('image/')){el=document.createElement('img');el.src=x.data;el.alt=x.name;g.appendChild(el)}else if(x.type.startsWith('video/')){el=document.createElement('video');el.src=x.data;el.controls=true;g.appendChild(el)}else{el=document.createElement('a');el.className='file-link';el.href=x.data;el.download=x.name;el.textContent='📎 '+x.name;l.appendChild(el)}el&&el.addEventListener('dblclick',()=>removeFile(i))})}
+function removeFile(i){if(!confirm('حذف هذا الملف؟'))return;const saved=JSON.parse(localStorage.getItem('files_'+currentSection)||'[]');saved.splice(i,1);localStorage.setItem('files_'+currentSection,JSON.stringify(saved));loadFiles()}
+function clearSection(){if(!confirm('حذف محتوى هذا القسم؟'))return;localStorage.removeItem('text_'+currentSection);localStorage.removeItem('files_'+currentSection);document.getElementById('editor').value='';loadFiles()}
+renderCards();
 </script>
-</body>
-</html>
+</body></html>
