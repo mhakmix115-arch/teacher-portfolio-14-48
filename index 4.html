@@ -85,6 +85,73 @@ function moveFile(i,d){const a=getSavedFiles(),folder=a[i].folder||'root',inds=a
 '),c=Number(prompt('اختاري رقم المجلد:
 '+names))-1;if(!folders[c])return;a[i].folder=folders[c].id;setSavedFiles(a);loadFiles()} function removeFile(i){if(!confirm('حذف هذا الملف؟'))return;const a=getSavedFiles();a.splice(i,1);setSavedFiles(a);loadFiles()}
 function clearSection(){if(!confirm('حذف محتوى هذا القسم بالكامل؟'))return;localStorage.removeItem(sectionKey('text'));localStorage.removeItem(sectionKey('files'));localStorage.removeItem(sectionKey('folders'));document.getElementById('editor').value='';currentFolderId='root';renderFolders();loadFiles()} function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-renderCards();
+/* ===== اعتماد الإدارة وحفظ الملاحظات ===== */
+
+function approvalKey(){
+  return sectionKey('approval');
+}
+
+function getApproval(){
+  try{
+    return JSON.parse(localStorage.getItem(approvalKey()) || '{}');
+  }catch(e){
+    return {};
+  }
+}
+
+function saveApproval(){
+  const adminName = prompt('اسم المديرة / الوكيلة / المشرفة:');
+  if(!adminName) return;
+
+  const note = prompt('اكتبي الملاحظة أو التوجيه:') || '';
+
+  const type = prompt(
+    'نوع الإجراء:\n1- مراجعة\n2- اعتماد\n3- توقيع\n4- ختم واعتماد'
+  );
+
+  const types = {
+    '1':'تمت المراجعة',
+    '2':'تم الاعتماد',
+    '3':'تم التوقيع',
+    '4':'تم الختم والاعتماد'
+  };
+
+  if(!types[type]) return;
+
+  const data = {
+    name: adminName,
+    note: note,
+    status: types[type],
+    date: new Date().toLocaleString('ar-SA')
+  };
+
+  localStorage.setItem(approvalKey(), JSON.stringify(data));
+
+  alert('✅ تم حفظ ' + data.status);
+  showApproval();
+}
+
+function showApproval(){
+  const a = getApproval();
+
+  if(!a.name){
+    alert('لا يوجد اعتماد إداري لهذا القسم حتى الآن.');
+    return;
+  }
+
+  alert(
+    '✅ حالة القسم: ' + a.status +
+    '\n\nالاسم: ' + a.name +
+    '\nالتاريخ: ' + a.date +
+    (a.note ? '\n\nالملاحظة:\n' + a.note : '')
+  );
+}
+
+function removeApproval(){
+  if(!confirm('هل تريدين حذف اعتماد هذا القسم؟')) return;
+
+  localStorage.removeItem(approvalKey());
+  alert('تم حذف الاعتماد.');
+}renderCards();
 </script>
 </body></html>
