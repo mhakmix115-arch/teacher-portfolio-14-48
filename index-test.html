@@ -64,12 +64,56 @@ function createFolder(){
   const name = prompt('اكتبي اسم المجلد');
   if(!name) return;
 
+  const icon = prompt(
+    'اختاري أيقونة:\n' +
+    '1- 📁 عام\n' +
+    '2- 🖼️ صور\n' +
+    '3- 🎥 فيديو\n' +
+    '4- 📄 ملفات\n' +
+    '5- 🏆 إنجازات\n' +
+    '6- 🩺 صحي\n' +
+    '7- 📊 تقارير\n' +
+    '8- ✨ مميز'
+  ) || '1';
+
+  const icons = {
+    '1':'📁',
+    '2':'🖼️',
+    '3':'🎥',
+    '4':'📄',
+    '5':'🏆',
+    '6':'🩺',
+    '7':'📊',
+    '8':'✨'
+  };
+
+  const color = prompt(
+    'اختاري لون المجلد:\n' +
+    '1- أخضر\n' +
+    '2- ذهبي\n' +
+    '3- بيج\n' +
+    '4- وردي هادئ\n' +
+    '5- أزرق هادئ\n' +
+    '6- بنفسجي هادئ'
+  ) || '1';
+
+  const colors = {
+    '1':'#2f5d50',
+    '2':'#b89b5e',
+    '3':'#d8c7a8',
+    '4':'#d8a7b1',
+    '5':'#91b7c7',
+    '6':'#aa9ac5'
+  };
+
   const key = 'folders_' + currentSection;
   const folders = JSON.parse(localStorage.getItem(key) || '[]');
 
   folders.push({
     id: Date.now(),
-    name: name
+    name: name,
+    icon: icons[icon] || '📁',
+    color: colors[color] || '#2f5d50'
   });
 
   localStorage.setItem(key, JSON.stringify(folders));
