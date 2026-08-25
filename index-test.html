@@ -42,7 +42,7 @@ body.cover-open{overflow:hidden}
   <button class="back" onclick="closePanel()">← العودة للأقسام</button>
   <h2 id="panelTitle"></h2><p id="panelDesc"></p>
   <textarea class="editor" id="editor" placeholder="اكتبي محتوى هذا القسم هنا..."></textarea>
-  <div class="actions"><button class="action" onclick="saveText()">حفظ النص</button><label class="action upload">رفع صور / فيديو / ملفات<input id="fileInput" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onchange="addFiles(event)"></label><button class="action" onclick="clearSection()">حذف محتوى القسم</button></div>
+  <div class="actions"><button class="action" onclick="saveText()">حفظ النص</button><label class="action upload">رفع صور / فيديو / ملفات<input id="fileInput" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onchange="addFiles(event)"></label><button class="action" onclick="clearSection()">حذف محتوى القسم</button><button class="action" type="button" onclick="createFolder()">＋ إنشاء مجلد</button></div>
   <div class="gallery" id="gallery"></div><div id="fileList"></div>
 </div></div>
 <script>
@@ -60,6 +60,20 @@ function addFiles(e){const incoming=[...e.target.files],saved=JSON.parse(localSt
 function loadFiles(){const g=document.getElementById('gallery'),l=document.getElementById('fileList');g.innerHTML='';l.innerHTML='';const saved=JSON.parse(localStorage.getItem('files_'+currentSection)||'[]');saved.forEach((x,i)=>{let el;if(x.type.startsWith('image/')){el=document.createElement('img');el.src=x.data;el.alt=x.name;g.appendChild(el)}else if(x.type.startsWith('video/')){el=document.createElement('video');el.src=x.data;el.controls=true;g.appendChild(el)}else{el=document.createElement('a');el.className='file-link';el.href=x.data;el.download=x.name;el.textContent='📎 '+x.name;l.appendChild(el)}el&&el.addEventListener('dblclick',()=>removeFile(i))})}
 function removeFile(i){if(!confirm('حذف هذا الملف؟'))return;const saved=JSON.parse(localStorage.getItem('files_'+currentSection)||'[]');saved.splice(i,1);localStorage.setItem('files_'+currentSection,JSON.stringify(saved));loadFiles()}
 function clearSection(){if(!confirm('حذف محتوى هذا القسم؟'))return;localStorage.removeItem('text_'+currentSection);localStorage.removeItem('files_'+currentSection);document.getElementById('editor').value='';loadFiles()}
-renderCards();
+function createFolder(){
+  const name = prompt('اكتبي اسم المجلد');
+  if(!name) return;
+
+  const key = 'folders_' + currentSection;
+  const folders = JSON.parse(localStorage.getItem(key) || '[]');
+
+  folders.push({
+    id: Date.now(),
+    name: name
+  });
+
+  localStorage.setItem(key, JSON.stringify(folders));
+  alert('تم إنشاء المجلد: ' + name);
+}renderCards();
 </script>
 </body></html>
