@@ -43,7 +43,7 @@ body.cover-open{overflow:hidden}
   <h2 id="panelTitle"></h2><p id="panelDesc"></p>
   <textarea class="editor" id="editor" placeholder="اكتبي محتوى هذا القسم هنا..."></textarea>
   <div class="actions"><button class="action" onclick="saveText()">حفظ النص</button><label class="action upload">رفع صور / فيديو / ملفات<input id="fileInput" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onchange="addFiles(event)"></label><button class="action" onclick="clearSection()">حذف محتوى القسم</button><button class="action" type="button" onclick="createFolder()">＋ إنشاء مجلد</button></div>
-  <div class="gallery" id="gallery"></div><div id="fileList"></div>
+ <div id="foldersArea"></div><div class="gallery" id="gallery"></div><div id="fileList"></div>
 </div></div>
 <script>
 const items=[
@@ -117,7 +117,44 @@ function createFolder(){
   });
 
   localStorage.setItem(key, JSON.stringify(folders));
-  alert('تم إنشاء المجلد: ' + name);
-}renderCards();
+renderFolders();
+alert('تم إنشاء المجلد: ' + name);
+}
+
+function renderFolders(){
+  const area = document.getElementById('foldersArea');
+  if(!area) return;
+
+  const key = 'folders_' + currentSection;
+  const folders = JSON.parse(localStorage.getItem(key) || '[]');
+
+  area.innerHTML = '';
+
+  folders.forEach(folder => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'folder-card';
+
+    card.style.background = folder.color || '#2f5d50';
+    card.style.color = '#fff';
+    card.style.border = '1px solid #d6b96f';
+    card.style.borderRadius = '18px';
+    card.style.padding = '16px';
+    card.style.margin = '8px';
+    card.style.minWidth = '130px';
+    card.style.fontSize = '18px';
+
+    card.innerHTML =
+      '<div style="font-size:34px">' +
+      (folder.icon || '📁') +
+      '</div><div>' +
+      folder.name +
+      '</div>';
+
+    area.appendChild(card);
+  });
+}
+
+renderCards();
 </script>
 </body></html>
