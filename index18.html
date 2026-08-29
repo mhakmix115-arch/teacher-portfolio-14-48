@@ -5,6 +5,21 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="apple-touch-icon" href="145B5362-D3F2-4B6C-8F20-1C956385604D.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = window.supabase.createClient(
+  'https://hfsfuyzxduinaekllipc.supabase.co',
+  'sb_publishable_E9uCMJvYUiY-YZZJCeV12w_oNhomoqk'
+);
+
+async function signInWithMicrosoft() {
+  await sb.auth.signInWithOAuth({
+    provider: 'azure',
+    options: {
+      redirectTo: 'https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index18.html'
+    }
+  });
+}
+</script>
   <title>ملف الإنجاز المهني — v17</title>
 <style>
 :root{
