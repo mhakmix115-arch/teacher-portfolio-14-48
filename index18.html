@@ -5,22 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="apple-touch-icon" href="145B5362-D3F2-4B6C-8F20-1C956385604D.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-const sb = window.supabase.createClient(
-  'https://hfsfuyzxduinaekllipc.supabase.co',
-  'sb_publishable_E9uCMJvYUiY-YZZJCeV12w_oNhomoqk'
-);
-
-async function signInWithMicrosoft() {
-  await sb.auth.signInWithOAuth({
-    provider: 'azure',
-    options: {
-      redirectTo: 'https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index18.html'
-    }
-  });
-}
-</script>
-  <title>ملف الإنجاز المهني — v17</title>
+<title>ملف الإنجاز المهني — v17</title>
 <style>
 :root{
   --green:#075b45;--green2:#0d6a54;--green3:#164f42;--gold:#c7a34b;--gold2:#e3c97b;
@@ -695,6 +680,37 @@ function renderCards(){
   items.forEach((it,i)=>{const label=sectionDisplayName(it[1]);const b=document.createElement('button');b.className='card';b.type='button';b.innerHTML=`<span class="icon">${it[0]}</span><span class="copy"><span class="title"><span class="num">${arNums[i]}.</span>${esc(label)}</span><span class="desc">${it[2]}</span></span>`;b.onclick=()=>openPanel(it[1],it[2]);box.appendChild(b)});
   renderSideNav();
 }
+const SUPABASE_URL='https://hfsfuyzxduinaekllipc.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_E9uCMJvYUiY-YZZJCeV12w_oNhomoqk';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+  auth:{persistSession:true,detectSessionInUrl:true,autoRefreshToken:true}
+});
+
+async function signInWithMicrosoft(){
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(session){openPortfolio();return}
+    const {error}=await sb.auth.signInWithOAuth({
+      provider:'azure',
+      options:{
+        redirectTo:'https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index18.html',
+        scopes:'email'
+      }
+    });
+    if(error) throw error;
+  }catch(err){
+    console.error(err);
+    alert('تعذر تسجيل الدخول بحساب Microsoft. حاولي مرة أخرى.');
+  }
+}
+
+async function restoreMicrosoftSession(){
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(session) openPortfolio();
+  }catch(err){console.error(err)}
+}
+
 function openPortfolio(){$('cover').style.display='none';$('portfolio').style.display='block';document.body.classList.remove('cover-open');window.scrollTo(0,0)}
 function goCover(){closePanel();$('portfolio').style.display='none';$('cover').style.display='grid';document.body.classList.add('cover-open');window.scrollTo(0,0)}
 function openPanel(title,desc){
@@ -1082,6 +1098,7 @@ function applyRole(){
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
+  restoreMicrosoftSession();
   try{
     renderCards();
     if($('roleSelect')) $('roleSelect').value=isManageMode?'teacher':'family';
