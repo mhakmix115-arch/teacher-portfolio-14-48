@@ -467,6 +467,39 @@ body.cover-open{overflow:hidden}
 .us-sign{width:100%;height:155px;background:#fff;border:1px dashed #c7a34b;border-radius:14px;touch-action:none}
 @media(min-width:700px){.us-grid.two{grid-template-columns:1fr 1fr}}
 
+
+/* ===== الاستبيانات المتقدمة ===== */
+.survey-pro-card{width:min(96%,980px);max-height:92vh;overflow:auto}
+.survey-pro-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.survey-tabs{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
+.survey-tab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 14px;color:var(--green);font-weight:900;cursor:pointer}
+.survey-tab.active{background:var(--green);color:#fff;border-color:var(--green)}
+.survey-pane{display:none}.survey-pane.active{display:block}
+.survey-helper{border:1px dashed var(--gold);border-radius:18px;background:#fff8e8;padding:13px}
+.survey-questions{display:grid;gap:10px}
+.survey-q-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px}
+.survey-q-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:9px}
+.survey-q-num{font-weight:900;color:var(--green)}
+.survey-option-row{display:flex;gap:7px;margin-top:6px}.survey-option-row input{flex:1}.survey-option-row button{flex:0 0 auto}
+.survey-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.survey-toolbar input{flex:1;min-width:180px}
+.survey-list{display:grid;gap:10px}.survey-list-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px}
+.survey-list-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.survey-list-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.survey-state{display:inline-block;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:900}.survey-state.published{background:#e7f5ef;color:#075b45}.survey-state.draft{background:#fff4d8;color:#805f13}.survey-state.closed{background:#f4e8e5;color:#8a3e32}
+.survey-share-box{border:1px dashed var(--gold);border-radius:14px;padding:10px;margin-top:9px;background:#fffaf1}
+.survey-share-url{direction:ltr;text-align:left;word-break:break-all;font-size:11px;background:#fff;border-radius:10px;padding:8px}
+.survey-share-qr{display:grid;place-items:center;background:#fff;border-radius:12px;padding:9px;min-height:150px;margin-top:8px}
+.survey-result-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.survey-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:13px 0}
+.survey-stat{border:1px solid var(--line);border-radius:15px;background:#fff;padding:12px;text-align:center}.survey-stat b{display:block;font-size:24px;color:var(--green)}
+.survey-role-stats{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}.survey-role-pill{border-radius:999px;background:#f4eddf;border:1px solid var(--line);padding:6px 10px;font-size:12px}
+.survey-result-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:13px;margin:10px 0}
+.survey-bar-row{display:grid;grid-template-columns:minmax(90px,1fr) minmax(120px,3fr) 55px;gap:8px;align-items:center;margin:7px 0}.survey-bar-track{height:13px;background:#f0eadf;border-radius:999px;overflow:hidden}.survey-bar-fill{height:100%;background:var(--green);border-radius:999px}
+.survey-pie{width:150px;height:150px;border-radius:50%;margin:12px auto;border:8px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.survey-text-answer{border:1px solid var(--line);border-radius:12px;padding:9px;margin:6px 0;background:#fffaf4}
+.survey-public-page{display:none;position:fixed;inset:0;z-index:20000;background:linear-gradient(180deg,#fffaf2,#f5ead7);overflow:auto;padding:calc(18px + env(safe-area-inset-top)) 14px calc(60px + env(safe-area-inset-bottom))}
+.survey-public-page.active{display:block}.survey-public-shell{width:min(94%,760px);margin:auto;background:#fffdf8;border:2px solid var(--gold);border-radius:26px;padding:18px;box-shadow:0 12px 36px #0001}.survey-public-brand{color:var(--gold);font-weight:900}.survey-public-shell h1{color:var(--green);font-size:28px;margin:6px 0}.survey-public-desc{line-height:1.9;color:#5f594f;margin-bottom:8px}.survey-public-q{border:1px solid var(--line);border-radius:16px;background:#fff;padding:13px;margin:10px 0}.survey-public-q h3{font-size:16px;color:var(--green);margin:0 0 9px}.survey-choice{display:flex;gap:8px;align-items:center;padding:7px 4px}.survey-choice input{width:auto}.survey-alert{border:1px solid #e6b5aa;background:#fff2ef;border-radius:14px;padding:12px;color:#8a3e32;margin:12px 0}
+@media(max-width:600px){.survey-bar-row{grid-template-columns:90px 1fr 45px}.survey-pro-card{padding:13px}}
+
 </style>
 </head>
 <body class="cover-open">
@@ -533,7 +566,7 @@ body.cover-open{overflow:hidden}
   <div class="specials">
     <button class="special-card" onclick="openRecommendations()"><b>💬 الاقتراحات والتوصيات</b><span>الإدارة • المشرفات • الأسر • الزائرات</span></button>
     <button class="special-card admin-only manage-only" onclick="openApprovals()"><b>✅ اعتماد الإدارة</b><span>مراجعة • اعتماد • توقيع • ختم</span></button>
-    <button class="special-card manage-only" onclick="openSurveys()"><b>📊 الاستبيانات والنتائج</b><span>أسئلة سريعة وحفظ النتائج محليًا</span></button>
+    <button class="special-card manage-only" onclick="openSurveys()"><b>📊 الاستبيانات والنتائج</b><span>إنشاء • نشر • رابط وباركود • نتائج ورسوم بيانية</span></button>
     <button class="special-card manage-only" onclick="cloudInfo()"><b>☁️ السحابة والحسابات</b><span>Supabase + Microsoft • مزامنة وصلاحيات بين الأجهزة</span></button>
     <button class="special-card teacher-only manage-only" type="button" onclick="unifiedShareOpen()"><b>🔗 المشاركة بالباركود</b><span>الإدارة والأسرة • روابط خاصة • اعتماد وملاحظات</span></button>
   </div>
@@ -657,18 +690,136 @@ body.cover-open{overflow:hidden}
   <div class="feed" id="approvalFeed" style="margin-top:14px"></div>
 </div></div>
 
-<!-- الاستبيانات -->
-<div class="modal" id="surveyModal"><div class="modal-card">
-  <h3>📊 الاستبيانات والنتائج</h3>
-  <div class="viewer-note" id="surveyScopeNote" style="margin-bottom:10px">يمكن إنشاء استبيان عام أو ربطه بالقسم المفتوح.</div>
-  <div class="form-grid">
-    <div class="field full"><label>السؤال</label><input id="surveyQuestion" placeholder="مثال: كيف تقيمين وضوح التواصل؟"></div>
-    <div class="field"><label>نوع الإجابة</label><select id="surveyType"><option value="rating">تقييم</option><option value="yesno">نعم / لا</option><option value="choice">اختيار واحد</option><option value="short">إجابة قصيرة</option></select></div>
-    <div class="field"><label>الإجابة / النتيجة</label><input id="surveyAnswer" placeholder="مثال: ممتاز أو نعم أو نص قصير"></div>
+<!-- الاستبيانات المتقدمة -->
+<div class="modal" id="surveyModal"><div class="modal-card survey-pro-card">
+  <div class="survey-pro-head">
+    <div>
+      <h3>📊 الاستبيانات والنتائج</h3>
+      <div class="viewer-note" id="surveyScopeNote">منشئ استبيان كامل داخل ملف الإنجاز.</div>
+    </div>
+    <button class="back" type="button" onclick="closeModal('surveyModal')">إغلاق</button>
   </div>
-  <div class="modal-actions"><button class="action secondary" onclick="closeModal('surveyModal')">إغلاق</button><button class="action" onclick="saveSurveyResponse()">إضافة نتيجة</button></div>
-  <div class="feed" id="surveyFeed" style="margin-top:14px"></div>
+
+  <div class="survey-tabs">
+    <button id="svTabBuild" class="survey-tab active" type="button" onclick="surveyTab('build')">✍️ إنشاء</button>
+    <button id="svTabList" class="survey-tab" type="button" onclick="surveyTab('list')">📚 استبياناتي</button>
+    <button id="svTabResults" class="survey-tab" type="button" onclick="surveyTab('results')">📈 النتائج</button>
+  </div>
+
+  <section id="svPaneBuild" class="survey-pane active">
+    <div class="survey-helper">
+      <b>✨ مساعد إنشاء الاستبيان</b>
+      <div class="form-grid" style="margin-top:8px">
+        <div class="field full"><label>اكتبي موضوع الاستبيان</label><input id="svHelperTopic" placeholder="مثال: رضا الأسر عن برنامج النظافة الشخصية"></div>
+        <div class="field"><label>الفئة المستهدفة</label>
+          <select id="svHelperAudience">
+            <option value="family">الأسر</option><option value="teacher">المعلمات</option>
+            <option value="staff">منسوبات الروضة</option><option value="all">الجميع</option>
+          </select>
+        </div>
+        <div class="field"><label>عدد الأسئلة المقترح</label>
+          <select id="svHelperCount"><option>5</option><option selected>8</option><option>10</option><option>12</option></select>
+        </div>
+      </div>
+      <div class="modal-actions" style="justify-content:flex-start">
+        <button class="action secondary" type="button" onclick="surveyGenerateDraft()">✨ أنشئ لي مسودة</button>
+      </div>
+    </div>
+
+    <div class="section-block" style="margin-top:12px">
+      <div class="form-grid">
+        <div class="field full"><label>عنوان الاستبيان</label><input id="svTitle" placeholder="مثال: استبيان رضا أولياء الأمور عن البرنامج الصحي"></div>
+        <div class="field full"><label>الوصف / التعليمات</label><textarea id="svDescription" placeholder="نشكركم على المشاركة، تستغرق الإجابة أقل من دقيقتين."></textarea></div>
+        <div class="field"><label>الفئات المسموح لها بالإجابة</label>
+          <select id="svAudienceMode">
+            <option value="all">الأسر + المعلمات + الإدارة + منسوبات الروضة</option>
+            <option value="family">الأسر فقط</option>
+            <option value="teacher">المعلمات فقط</option>
+            <option value="staff">منسوبات الروضة فقط</option>
+            <option value="admin">الإدارة فقط</option>
+          </select>
+        </div>
+        <div class="field"><label>تاريخ إغلاق الاستبيان (اختياري)</label><input id="svCloseDate" type="date"></div>
+        <div class="field"><label>القسم المرتبط</label><input id="svSection" readonly></div>
+        <div class="field"><label>الحالة</label><select id="svStatus"><option value="draft">مسودة</option><option value="published">نشر مباشرة</option></select></div>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="block-title">
+        <h3>❓ الأسئلة</h3>
+        <button class="action" type="button" onclick="surveyAddQuestion()">＋ إضافة سؤال</button>
+      </div>
+      <div id="svQuestions" class="survey-questions"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="action secondary" type="button" onclick="surveySaveDraft()">💾 حفظ كمسودة</button>
+      <button class="action" type="button" onclick="surveyPublish()">🚀 حفظ ونشر الاستبيان</button>
+      <button class="action secondary" type="button" onclick="surveyResetBuilder()">استبيان جديد</button>
+    </div>
+    <div id="svBuildMessage"></div>
+  </section>
+
+  <section id="svPaneList" class="survey-pane">
+    <div class="survey-toolbar">
+      <input id="svSearch" type="search" placeholder="بحث في الاستبيانات..." oninput="surveyRenderList()">
+      <select id="svFilter" onchange="surveyRenderList()"><option value="all">الكل</option><option value="published">المنشورة</option><option value="draft">المسودات</option><option value="closed">المغلقة</option></select>
+      <button class="action secondary" type="button" onclick="surveyLoadCloudList()">↻ تحديث</button>
+    </div>
+    <div id="svList" class="survey-list"></div>
+  </section>
+
+  <section id="svPaneResults" class="survey-pane">
+    <div id="svResultsEmpty" class="empty-state">اختاري استبيانًا من «استبياناتي» ثم اضغطي «عرض النتائج».</div>
+    <div id="svResultsBox" class="hidden">
+      <div class="survey-result-top">
+        <div><h3 id="svResultTitle" style="margin:0"></h3><div id="svResultMeta" class="viewer-note"></div></div>
+        <div class="modal-actions" style="margin:0">
+          <button class="action secondary" type="button" onclick="surveyRefreshResults()">↻ تحديث</button>
+          <button class="action secondary" type="button" onclick="surveyPrintResults()">🖨️ طباعة / PDF</button>
+        </div>
+      </div>
+      <div id="svResultStats" class="survey-stats"></div>
+      <div id="svRoleStats" class="survey-role-stats"></div>
+      <div id="svQuestionResults" class="survey-question-results"></div>
+    </div>
+  </section>
 </div></div>
+
+<!-- صفحة المشارك في الاستبيان داخل نفس ملف الإنجاز -->
+<section id="surveyPublicPage" class="survey-public-page">
+  <div class="survey-public-shell">
+    <div class="survey-public-brand">📊 ملف الإنجاز المهني</div>
+    <h1 id="spTitle">استبيان</h1>
+    <div id="spDescription" class="survey-public-desc"></div>
+    <div id="spMeta" class="viewer-note"></div>
+
+    <div id="spClosed" class="survey-alert hidden">هذا الاستبيان مغلق أو انتهت صلاحيته.</div>
+
+    <div id="spFormWrap">
+      <div class="section-block">
+        <div class="form-grid">
+          <div class="field"><label>صفة المشارك</label>
+            <select id="spRole">
+              <option value="family">ولي أمر / أسرة</option>
+              <option value="teacher">معلمة</option>
+              <option value="admin">إدارة</option>
+              <option value="staff">منسوبات الروضة</option>
+              <option value="other">أخرى</option>
+            </select>
+          </div>
+          <div class="field"><label>الاسم (اختياري)</label><input id="spName" placeholder="يمكن تركه فارغًا"></div>
+        </div>
+      </div>
+      <div id="spQuestions"></div>
+      <div class="modal-actions" style="justify-content:center">
+        <button class="action" type="button" onclick="surveySubmitPublic()">إرسال الاستجابة</button>
+      </div>
+      <div id="spMessage"></div>
+    </div>
+  </div>
+</section>
 
 <button id="publicRecommendFab" class="public-fab hidden" type="button" onclick="openRecommendations()">💬 أضف رأيك</button>
 
@@ -1272,12 +1423,344 @@ function openRecommendations(){renderRecommendations();openModal('recommendModal
 function addRecommendation(){const name=$('recName').value.trim(),text=$('recText').value.trim();if(!name||!text){toast('أكملي الاسم والنص');return}const a=recommendations();a.unshift({id:String(now()),category:$('recCategory').value,type:$('recType').value,name,text,date:now()});setJSON('recommendations',a);$('recText').value='';renderRecommendations();toast('تم حفظ المشاركة')}
 function renderRecommendations(){const e=$('recommendFeed'),a=recommendations();e.innerHTML=a.length?a.map(x=>`<div class="feed-item"><span class="tag">${esc(x.category)}</span><span class="tag">${esc(x.type)}</span><strong>${esc(x.name)}</strong><p>${esc(x.text)}</p><small>${fmt(x.date)}</small></div>`).join(''):'<div class="empty-state">لا توجد اقتراحات أو توصيات بعد.</div>'}
 
-/* استبيانات مبسطة */
-function surveyData(){return getJSON('surveyResponses',[])}
-function openSurveys(){window._surveyScope='عام';$('surveyScopeNote').textContent='استبيان عام للملف. النتائج في هذه النسخة محفوظة محليًا على هذا الجهاز.';renderSurvey();openModal('surveyModal')}
-function openSectionSurvey(){window._surveyScope=currentSection||'عام';$('surveyScopeNote').textContent='الاستبيان مرتبط بالقسم: '+(currentSection||'عام')+' — بعد ربط Supabase يمكن مشاركة الرابط واستقبال الردود من أجهزة أخرى.';renderSurvey();openModal('surveyModal')}
-function saveSurveyResponse(){const q=$('surveyQuestion').value.trim(),ans=$('surveyAnswer').value.trim();if(!q){toast('اكتبي السؤال');return}if(!ans){toast('اكتبي الإجابة أو النتيجة');return}const a=surveyData();a.unshift({section:window._surveyScope||'عام',q,type:$('surveyType')?.value||'rating',answer:ans,date:now()});setJSON('surveyResponses',a);$('surveyAnswer').value='';renderSurvey();toast('تمت إضافة النتيجة')}
-function renderSurvey(){const e=$('surveyFeed'),scope=window._surveyScope||null,a=surveyData().filter(x=>!scope||scope==='عام'||x.section===scope);if(!a.length){e.innerHTML='<div class="empty-state">لا توجد نتائج بعد.</div>';return}const counts={};a.forEach(x=>{const k=(x.section||'عام')+'|||'+x.q+'|||'+x.answer;counts[k]=(counts[k]||0)+1});e.innerHTML=Object.entries(counts).map(([k,n])=>{const [section,q,ans]=k.split('|||');return`<div class="feed-item"><span class="tag">${esc(section)}</span><strong>${esc(q)}</strong><br><span class="tag">${esc(ans)}</span> <b>${n}</b> استجابة</div>`}).join('')}
+/* ===== الاستبيانات المتقدمة ===== */
+let surveyBuilderQuestions=[];
+let surveyEditingId=null;
+let surveyCurrentResultsId=null;
+let surveyCloudCache=[];
+let surveyPublicData=null;
+
+const surveyRoleLabels={family:'الأسر',teacher:'المعلمات',admin:'الإدارة',staff:'منسوبات الروضة',other:'أخرى'};
+
+function surveyLocalList(){return getJSON('surveys_v2',[])}
+function surveySetLocalList(v){setJSON('surveys_v2',v)}
+function surveyLocalResponses(){return getJSON('surveyResponses_v2',[])}
+function surveySetLocalResponses(v){setJSON('surveyResponses_v2',v)}
+
+function openSurveys(){
+  window._surveyScope='عام';
+  $('surveyScopeNote').textContent='إنشاء الاستبيان ونشره وإرسال نفس الرابط للأسر والمعلمات والإدارة ومنسوبات الروضة، والنتائج تظهر هنا داخل ملف الإنجاز.';
+  surveyPrepareBuilder(false);
+  surveyTab('build');
+  surveyLoadCloudList();
+  openModal('surveyModal');
+}
+function openSectionSurvey(){
+  window._surveyScope=currentSection||'عام';
+  $('surveyScopeNote').textContent='الاستبيان مرتبط بالقسم: '+sectionDisplayName(currentSection||'عام');
+  surveyPrepareBuilder(false);
+  surveyTab('build');
+  surveyLoadCloudList();
+  openModal('surveyModal');
+}
+function surveyTab(name){
+  ['build','list','results'].forEach(n=>{
+    $('svPane'+n[0].toUpperCase()+n.slice(1))?.classList.toggle('active',n===name);
+    $('svTab'+n[0].toUpperCase()+n.slice(1))?.classList.toggle('active',n===name);
+  });
+}
+function surveyPrepareBuilder(force){
+  if(force||!surveyBuilderQuestions.length) surveyBuilderQuestions=[];
+  $('svSection').value=window._surveyScope==='عام'?'عام':sectionDisplayName(window._surveyScope||'عام');
+  if(!surveyBuilderQuestions.length) surveyAddQuestion('single','ما مدى رضاك عن هذا البرنامج؟',['راضٍ جدًا','راضٍ','محايد','غير راضٍ']);
+}
+function surveyQuestionTemplate(type='single',text='',options=[]){
+  return {id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),type,text,required:true,options:[...options]};
+}
+function surveyAddQuestion(type='single',text='',options=[]){
+  surveyBuilderQuestions.push(surveyQuestionTemplate(type,text,options));
+  surveyRenderBuilderQuestions();
+}
+function surveyRemoveQuestion(id){
+  surveyBuilderQuestions=surveyBuilderQuestions.filter(q=>q.id!==id);
+  surveyRenderBuilderQuestions();
+}
+function surveyMoveQuestion(id,dir){
+  const i=surveyBuilderQuestions.findIndex(q=>q.id===id),j=i+dir;
+  if(i<0||j<0||j>=surveyBuilderQuestions.length)return;
+  [surveyBuilderQuestions[i],surveyBuilderQuestions[j]]=[surveyBuilderQuestions[j],surveyBuilderQuestions[i]];
+  surveyRenderBuilderQuestions();
+}
+function surveyUpdateQuestion(id,key,value){
+  const q=surveyBuilderQuestions.find(x=>x.id===id);if(!q)return;
+  q[key]=key==='required'?!!value:value;
+  if(key==='type'&&['yesno','rating','short','long'].includes(value)) q.options=[];
+  if(key==='type'&&['single','multiple'].includes(value)&&!q.options.length) q.options=['الخيار الأول','الخيار الثاني'];
+  surveyRenderBuilderQuestions();
+}
+function surveyAddOption(id){
+  const q=surveyBuilderQuestions.find(x=>x.id===id);if(!q)return;
+  q.options.push('خيار جديد');surveyRenderBuilderQuestions();
+}
+function surveyUpdateOption(id,index,value){
+  const q=surveyBuilderQuestions.find(x=>x.id===id);if(!q)return;q.options[index]=value;
+}
+function surveyRemoveOption(id,index){
+  const q=surveyBuilderQuestions.find(x=>x.id===id);if(!q)return;
+  q.options.splice(index,1);surveyRenderBuilderQuestions();
+}
+function surveyRenderBuilderQuestions(){
+  const box=$('svQuestions');
+  if(!surveyBuilderQuestions.length){box.innerHTML='<div class="empty-state">أضيفي سؤالًا واحدًا على الأقل.</div>';return}
+  box.innerHTML=surveyBuilderQuestions.map((q,i)=>{
+    const optHtml=['single','multiple'].includes(q.type)?`
+      <div class="field full"><label>الخيارات</label>
+        ${(q.options||[]).map((o,oi)=>`<div class="survey-option-row"><input value="${esc(o)}" oninput="surveyUpdateOption('${q.id}',${oi},this.value)"><button class="action danger" type="button" onclick="surveyRemoveOption('${q.id}',${oi})">×</button></div>`).join('')}
+        <button class="action secondary" type="button" onclick="surveyAddOption('${q.id}')" style="margin-top:7px">＋ خيار</button>
+      </div>`:'';
+    return `<div class="survey-q-card">
+      <div class="survey-q-head"><span class="survey-q-num">السؤال ${i+1}</span><div>
+        <button class="action secondary" type="button" onclick="surveyMoveQuestion('${q.id}',-1)">↑</button>
+        <button class="action secondary" type="button" onclick="surveyMoveQuestion('${q.id}',1)">↓</button>
+        <button class="action danger" type="button" onclick="surveyRemoveQuestion('${q.id}')">حذف</button>
+      </div></div>
+      <div class="form-grid">
+        <div class="field full"><label>نص السؤال</label><input value="${esc(q.text)}" oninput="surveyUpdateQuestion('${q.id}','text',this.value)" placeholder="اكتبي السؤال"></div>
+        <div class="field"><label>نوع السؤال</label><select onchange="surveyUpdateQuestion('${q.id}','type',this.value)">
+          <option value="yesno" ${q.type==='yesno'?'selected':''}>نعم / لا</option>
+          <option value="single" ${q.type==='single'?'selected':''}>اختيار واحد</option>
+          <option value="multiple" ${q.type==='multiple'?'selected':''}>اختيار متعدد</option>
+          <option value="rating" ${q.type==='rating'?'selected':''}>مقياس 1 إلى 5</option>
+          <option value="short" ${q.type==='short'?'selected':''}>نص قصير</option>
+          <option value="long" ${q.type==='long'?'selected':''}>نص طويل</option>
+        </select></div>
+        <div class="field"><label>إلزامي؟</label><select onchange="surveyUpdateQuestion('${q.id}','required',this.value==='yes')"><option value="yes" ${q.required?'selected':''}>نعم</option><option value="no" ${!q.required?'selected':''}>لا</option></select></div>
+        ${optHtml}
+      </div>
+    </div>`
+  }).join('');
+}
+function surveyGenerateDraft(){
+  const topic=$('svHelperTopic').value.trim();
+  if(!topic){toast('اكتبي موضوع الاستبيان');return}
+  const count=Number($('svHelperCount').value||8);
+  const audience=$('svHelperAudience').value;
+  $('svTitle').value='استبيان '+topic;
+  $('svDescription').value='نهدف من هذا الاستبيان إلى التعرف على آرائكم حول '+topic+'، ونقدر مشاركتكم.';
+  $('svAudienceMode').value=audience==='all'?'all':audience;
+  const generic=[
+    ['single','ما مدى رضاك عن '+topic+'؟',['راضٍ جدًا','راضٍ','محايد','غير راضٍ']],
+    ['rating','قيّمي جودة '+topic+' من 1 إلى 5.',[]],
+    ['yesno','هل حقق '+topic+' الهدف المتوقع؟',[]],
+    ['single','كيف تقيّمين وضوح المعلومات المقدمة؟',['ممتاز','جيد جدًا','جيد','يحتاج تحسين']],
+    ['single','كيف تقيّمين تنظيم وتنفيذ '+topic+'؟',['ممتاز','جيد جدًا','جيد','يحتاج تحسين']],
+    ['yesno','هل ترغبين في تكرار برامج أو مبادرات مشابهة؟',[]],
+    ['multiple','ما الجوانب الأكثر فائدة بالنسبة لك؟',['المحتوى','التنظيم','التواصل','الأنشطة','المتابعة']],
+    ['long','ما أبرز اقتراحاتك لتطوير '+topic+'؟',[]],
+    ['short','اذكري أكثر جانب أعجبك في '+topic+'.',[]],
+    ['single','هل توصي بالمشاركة في برامج مشابهة مستقبلًا؟',['نعم بالتأكيد','ربما','لا']],
+    ['rating','قيّمي مستوى التواصل والمتابعة من 1 إلى 5.',[]],
+    ['long','هل لديك ملاحظة إضافية؟',[]]
+  ];
+  surveyBuilderQuestions=generic.slice(0,Math.min(count,generic.length)).map(x=>surveyQuestionTemplate(x[0],x[1],x[2]));
+  surveyRenderBuilderQuestions();
+  toast('تم إنشاء مسودة ويمكنك تعديلها بالكامل');
+}
+function surveyCollectBuilder(){
+  surveyBuilderQuestions.forEach(q=>q.text=(q.text||'').trim());
+  const title=$('svTitle').value.trim();
+  if(!title)throw new Error('اكتبي عنوان الاستبيان');
+  if(!surveyBuilderQuestions.length||surveyBuilderQuestions.some(q=>!q.text))throw new Error('أكملي نصوص الأسئلة');
+  for(const q of surveyBuilderQuestions){
+    if(['single','multiple'].includes(q.type)){
+      q.options=(q.options||[]).map(x=>x.trim()).filter(Boolean);
+      if(q.options.length<2)throw new Error('أسئلة الاختيارات تحتاج خيارين على الأقل');
+    }
+  }
+  return {
+    id:surveyEditingId||crypto.randomUUID?.()||String(Date.now()),
+    title,
+    description:$('svDescription').value.trim(),
+    audience:$('svAudienceMode').value,
+    close_date:$('svCloseDate').value||null,
+    section_key:window._surveyScope||'عام',
+    section_label:$('svSection').value||'عام',
+    status:$('svStatus').value,
+    questions:JSON.parse(JSON.stringify(surveyBuilderQuestions)),
+    updated_at:new Date().toISOString()
+  };
+}
+function surveySaveDraft(){
+  try{
+    const s=surveyCollectBuilder();s.status='draft';
+    const list=surveyLocalList();const i=list.findIndex(x=>x.id===s.id);
+    if(i>=0)list[i]=s;else list.unshift(s);surveySetLocalList(list);
+    surveyEditingId=s.id;
+    $('svBuildMessage').innerHTML='<div class="us-ok">تم حفظ المسودة على الجهاز.</div>';
+    surveyRenderList();
+  }catch(e){$('svBuildMessage').innerHTML='<div class="us-err">'+esc(e.message)+'</div>'}
+}
+async function surveyPublish(){
+  try{
+    const s=surveyCollectBuilder();s.status='published';
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session)throw new Error('يلزم تسجيل دخول المعلمة بحساب Microsoft');
+    const payload={
+      p_survey_id:surveyEditingId||null,
+      p_title:s.title,p_description:s.description,p_audience:s.audience,
+      p_section:s.section_key,p_questions:s.questions,p_close_date:s.close_date
+    };
+    const {data,error}=await sb.rpc('survey_publish_v1',payload);
+    if(error)throw error;
+    s.id=data.id;s.token=data.token;s.status='published';s.created_at=data.created_at||new Date().toISOString();
+    surveyEditingId=s.id;
+    const list=surveyLocalList();const i=list.findIndex(x=>x.id===s.id||x.id===payload.p_survey_id);
+    if(i>=0)list[i]=s;else list.unshift(s);surveySetLocalList(list);
+    $('svBuildMessage').innerHTML='<div class="us-ok">✅ تم نشر الاستبيان. افتحي «استبياناتي» لإرسال الرابط أو الباركود.</div>';
+    await surveyLoadCloudList();surveyTab('list');
+  }catch(e){
+    console.error(e);
+    const msg=(e.message||'').includes('survey_publish_v1')?'يحتاج قسم الاستبيانات تفعيل Supabase مرة واحدة.':'تعذر النشر: '+(e.message||'');
+    $('svBuildMessage').innerHTML='<div class="us-err">'+esc(msg)+'</div>';
+  }
+}
+function surveyResetBuilder(){
+  surveyEditingId=null;surveyBuilderQuestions=[];
+  ['svTitle','svDescription','svCloseDate','svHelperTopic'].forEach(id=>{if($(id))$(id).value=''});
+  $('svStatus').value='draft';surveyPrepareBuilder(true);$('svBuildMessage').innerHTML='';
+}
+function surveyEdit(id){
+  const s=[...surveyCloudCache,...surveyLocalList()].find(x=>x.id===id);if(!s)return;
+  surveyEditingId=s.id;$('svTitle').value=s.title||'';$('svDescription').value=s.description||'';
+  $('svAudienceMode').value=s.audience||'all';$('svCloseDate').value=s.close_date?s.close_date.slice(0,10):'';
+  $('svStatus').value=s.status==='published'?'published':'draft';
+  window._surveyScope=s.section_key||'عام';$('svSection').value=s.section_label||sectionDisplayName(s.section_key||'عام');
+  surveyBuilderQuestions=JSON.parse(JSON.stringify(s.questions||[]));surveyRenderBuilderQuestions();surveyTab('build');
+}
+async function surveyLoadCloudList(){
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session){surveyCloudCache=[];surveyRenderList();return}
+    const {data,error}=await sb.rpc('survey_list_owner_v1');
+    if(error)throw error;
+    surveyCloudCache=(data||[]).map(x=>({...x,questions:x.questions||[]}));
+  }catch(e){console.warn(e);surveyCloudCache=[]}
+  surveyRenderList();
+}
+function surveyCombinedList(){
+  const map=new Map();surveyLocalList().forEach(x=>map.set(x.id,x));surveyCloudCache.forEach(x=>map.set(x.id,{...(map.get(x.id)||{}),...x}));
+  return [...map.values()].sort((a,b)=>new Date(b.updated_at||b.created_at||0)-new Date(a.updated_at||a.created_at||0));
+}
+function surveyStateLabel(s){
+  if(s.status==='closed')return 'مغلق';if(s.status==='published')return 'منشور';return 'مسودة';
+}
+function surveyRenderList(){
+  const q=($('svSearch')?.value||'').trim().toLowerCase(),filter=$('svFilter')?.value||'all';
+  let list=surveyCombinedList();
+  if(q)list=list.filter(s=>(s.title||'').toLowerCase().includes(q));
+  if(filter!=='all')list=list.filter(s=>s.status===filter);
+  const box=$('svList');
+  if(!list.length){box.innerHTML='<div class="empty-state">لا توجد استبيانات بعد.</div>';return}
+  box.innerHTML=list.map(s=>{
+    const link=s.token?`${location.origin}${location.pathname}?survey=${encodeURIComponent(s.token)}`:'';
+    return `<div class="survey-list-card">
+      <div class="survey-list-head"><div><strong>${esc(s.title)}</strong><div class="viewer-note">${esc(s.section_label||s.section_key||'عام')} • ${s.questions?.length||0} سؤال</div></div><span class="survey-state ${esc(s.status||'draft')}">${surveyStateLabel(s)}</span></div>
+      <div class="survey-list-actions">
+        <button class="action secondary" type="button" onclick="surveyEdit('${s.id}')">✏️ تعديل</button>
+        ${s.token?`<button class="action" type="button" onclick="surveyShowShare('${s.id}')">🔗 رابط وباركود</button><button class="action secondary" type="button" onclick="surveyShowResults('${s.id}')">📈 عرض النتائج</button><button class="action secondary" type="button" onclick="surveyToggleClosed('${s.id}','${s.status}')">${s.status==='closed'?'فتح':'إغلاق'}</button>`:''}
+      </div>
+      <div id="svShare_${s.id}" class="survey-share-box hidden"></div>
+    </div>`
+  }).join('');
+}
+function surveyShowShare(id){
+  const s=surveyCombinedList().find(x=>x.id===id);if(!s?.token)return;
+  const link=`${location.origin}${location.pathname}?survey=${encodeURIComponent(s.token)}`;
+  const box=$('svShare_'+id);box.classList.toggle('hidden');
+  if(box.dataset.ready)return;box.dataset.ready='1';
+  box.innerHTML=`<div class="survey-share-url">${esc(link)}</div><div class="survey-share-qr" id="svQr_${id}"></div><div class="survey-list-actions"><button class="action secondary" type="button" onclick="navigator.clipboard.writeText('${link}');toast('تم نسخ الرابط')">نسخ الرابط</button><button class="action secondary" type="button" onclick="surveyNativeShare('${link}','${esc(s.title).replace(/'/g,'&#39;')}')">إرسال</button></div>`;
+  if(window.QRCode)new QRCode($('svQr_'+id),{text:link,width:145,height:145,correctLevel:QRCode.CorrectLevel.M});
+}
+async function surveyNativeShare(link,title){
+  if(navigator.share){try{await navigator.share({title,url:link});return}catch(e){}}
+  await navigator.clipboard.writeText(link);toast('تم نسخ الرابط');
+}
+async function surveyToggleClosed(id,status){
+  try{
+    const next=status==='closed'?'published':'closed';
+    const {error}=await sb.rpc('survey_set_status_v1',{p_survey_id:id,p_status:next});
+    if(error)throw error;await surveyLoadCloudList();
+  }catch(e){toast('تعذر تغيير الحالة')}
+}
+async function surveyShowResults(id){
+  surveyCurrentResultsId=id;surveyTab('results');await surveyRefreshResults();
+}
+function surveyPieGradient(rows){
+  const vals=rows.map(x=>x.count||0),total=vals.reduce((a,b)=>a+b,0)||1;
+  let start=0;const colors=['#075b45','#c7a34b','#7e9b8f','#c77f5c','#8a6fa8','#5d86ad'];
+  const parts=vals.map((v,i)=>{const a=start,b=start+v/total*360;start=b;return `${colors[i%colors.length]} ${a}deg ${b}deg`});
+  return `conic-gradient(${parts.join(',')})`;
+}
+async function surveyRefreshResults(){
+  if(!surveyCurrentResultsId)return;
+  const s=surveyCombinedList().find(x=>x.id===surveyCurrentResultsId);
+  $('svResultsEmpty').classList.add('hidden');$('svResultsBox').classList.remove('hidden');$('svResultTitle').textContent=s?.title||'النتائج';
+  try{
+    const {data,error}=await sb.rpc('survey_results_v1',{p_survey_id:surveyCurrentResultsId});
+    if(error)throw error;
+    const r=data||{},total=r.total_responses||0;
+    $('svResultMeta').textContent=`آخر تحديث: ${new Date().toLocaleString('ar-SA')}`;
+    $('svResultStats').innerHTML=`<div class="survey-stat"><b>${total}</b>إجمالي الاستجابات</div><div class="survey-stat"><b>${r.completed_today||0}</b>اليوم</div><div class="survey-stat"><b>${r.questions_count||s?.questions?.length||0}</b>عدد الأسئلة</div>`;
+    const roles=r.by_role||{};
+    $('svRoleStats').innerHTML=Object.entries(roles).map(([k,n])=>`<span class="survey-role-pill">${surveyRoleLabels[k]||k}: <b>${n}</b></span>`).join('');
+    $('svQuestionResults').innerHTML=(r.questions||[]).map((q,qi)=>{
+      if(['short','long'].includes(q.type)){
+        return `<div class="survey-result-card"><strong>${qi+1}. ${esc(q.text)}</strong>${(q.answers||[]).length?(q.answers||[]).map(a=>`<div class="survey-text-answer">${esc(a)}</div>`).join(''):'<div class="empty-state">لا توجد إجابات نصية.</div>'}</div>`
+      }
+      const rows=q.options||[],mx=Math.max(1,...rows.map(x=>x.count||0));
+      return `<div class="survey-result-card"><strong>${qi+1}. ${esc(q.text)}</strong><div class="survey-pie" style="background:${surveyPieGradient(rows)}"></div>${rows.map(x=>`<div class="survey-bar-row"><span>${esc(x.label)}</span><div class="survey-bar-track"><div class="survey-bar-fill" style="width:${(x.count||0)/mx*100}%"></div></div><b>${x.count||0}</b></div>`).join('')}</div>`
+    }).join('');
+  }catch(e){
+    console.error(e);$('svQuestionResults').innerHTML='<div class="survey-alert">تعذر تحميل النتائج من السحابة.</div>';
+  }
+}
+function surveyPrintResults(){window.print()}
+
+async function surveyLoadPublic(){
+  const token=new URLSearchParams(location.search).get('survey');if(!token)return;
+  try{
+    document.body.classList.remove('cover-open');$('cover')?.style.setProperty('display','none');$('portfolio')?.style.setProperty('display','none');$('panel')?.classList.remove('active');
+    $('surveyPublicPage').classList.add('active');
+    const {data,error}=await sb.rpc('survey_public_get_v1',{p_token:token});
+    if(error)throw error;if(!data?.valid)throw new Error('closed');
+    surveyPublicData={...data,token};$('spTitle').textContent=data.title;$('spDescription').textContent=data.description||'';$('spMeta').textContent=data.close_date?`متاح حتى ${new Date(data.close_date).toLocaleDateString('ar-SA')}`:'';
+    surveyRenderPublicQuestions(data.questions||[]);
+  }catch(e){
+    $('surveyPublicPage').classList.add('active');$('spClosed').classList.remove('hidden');$('spFormWrap').classList.add('hidden');
+  }
+}
+function surveyRenderPublicQuestions(questions){
+  $('spQuestions').innerHTML=questions.map((q,i)=>{
+    let body='';
+    if(q.type==='yesno')body=['نعم','لا'].map(o=>`<label class="survey-choice"><input type="radio" name="spq_${q.id}" value="${o}">${o}</label>`).join('');
+    else if(q.type==='single')body=(q.options||[]).map(o=>`<label class="survey-choice"><input type="radio" name="spq_${q.id}" value="${esc(o)}">${esc(o)}</label>`).join('');
+    else if(q.type==='multiple')body=(q.options||[]).map(o=>`<label class="survey-choice"><input type="checkbox" name="spq_${q.id}" value="${esc(o)}">${esc(o)}</label>`).join('');
+    else if(q.type==='rating')body=[1,2,3,4,5].map(o=>`<label class="survey-choice" style="display:inline-flex"><input type="radio" name="spq_${q.id}" value="${o}">${o}</label>`).join('');
+    else if(q.type==='long')body=`<textarea id="spq_${q.id}" placeholder="اكتبي إجابتك"></textarea>`;
+    else body=`<input id="spq_${q.id}" placeholder="اكتبي إجابتك">`;
+    return `<div class="survey-public-q" data-qid="${q.id}" data-type="${q.type}" data-required="${q.required?'1':'0'}"><h3>${i+1}. ${esc(q.text)} ${q.required?'<span style="color:#a23">*</span>':''}</h3>${body}</div>`
+  }).join('');
+}
+function surveyCollectPublicAnswers(){
+  const answers=[];
+  $('spQuestions').querySelectorAll('.survey-public-q').forEach(card=>{
+    const id=card.dataset.qid,type=card.dataset.type,req=card.dataset.required==='1';let value=null;
+    if(type==='multiple')value=[...card.querySelectorAll('input:checked')].map(x=>x.value);
+    else if(['yesno','single','rating'].includes(type))value=card.querySelector('input:checked')?.value||'';
+    else value=card.querySelector('input,textarea')?.value.trim()||'';
+    if(req&&(!value||(Array.isArray(value)&&!value.length)))throw new Error('أكملي جميع الأسئلة المطلوبة');
+    answers.push({question_id:id,type,value});
+  });return answers;
+}
+async function surveySubmitPublic(){
+  try{
+    const answers=surveyCollectPublicAnswers();
+    const {data,error}=await sb.rpc('survey_submit_v1',{p_token:surveyPublicData.token,p_role:$('spRole').value,p_name:$('spName').value.trim()||null,p_answers:answers});
+    if(error)throw error;
+    $('spMessage').innerHTML='<div class="us-ok">✅ شكرًا لك، تم إرسال الاستجابة بنجاح.</div>';$('spFormWrap').querySelectorAll('input,textarea,select,button').forEach(x=>x.disabled=true);
+  }catch(e){$('spMessage').innerHTML='<div class="us-err">'+esc(e.message||'تعذر إرسال الاستجابة')+'</div>'}
+}
+window.addEventListener('DOMContentLoaded',()=>setTimeout(surveyLoadPublic,80));
 
 function cloudInfo(){alert('بما أن لديك حساب Microsoft، فهذا يساعدنا في مرحلة الدخول الحقيقي. الربط النهائي سيكون عبر Supabase للحفظ السحابي والصلاحيات، ثم إعداد تسجيل الدخول بواسطة Microsoft / Microsoft Entra إذا كان حسابك المؤسسي يسمح بذلك. هذه النسخة الحالية لا تسجل الدخول إلى Microsoft تلقائيًا بعد؛ تحتاج مرحلة إعداد آمنة تشمل مشروع Supabase وإعداد تطبيق Microsoft وربط عنوان الموقع. بعدها يمكن للمعلمة والإدارة والأسرة الدخول بحسابات منفصلة وتظهر الملفات والاعتمادات والاستبيانات بين الأجهزة.')}
 
