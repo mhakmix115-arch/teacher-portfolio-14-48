@@ -440,6 +440,33 @@ body.cover-open{overflow:hidden}
 .modal:target{display:grid!important;place-items:center}
 .special-card.link-card{display:block;text-decoration:none}
 
+
+/* ===== المشاركة بالباركود داخل نفس ملف الإنجاز — مراجعة نهائية ===== */
+#usOverlay{
+  display:none;position:fixed;inset:0;z-index:10000;overflow:auto;
+  background:linear-gradient(180deg,#fffaf2,#f5ead7);
+  padding:calc(18px + env(safe-area-inset-top)) 14px calc(60px + env(safe-area-inset-bottom));
+}
+#usOverlay.active{display:block}
+.us-shell{width:min(94%,820px);margin:auto;background:#fffdf8;border:2px solid #c7a34b;border-radius:26px;padding:18px;box-shadow:0 12px 36px rgba(68,48,18,.10)}
+.us-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;position:sticky;top:0;background:#fffdf8;padding:4px 0 10px;z-index:2}
+.us-head h1{margin:0;color:#075b45;font-size:24px}
+.us-back{border:1px solid #c7a34b;border-radius:12px;padding:9px 13px;background:#fff;color:#075b45;font:inherit;font-weight:900;cursor:pointer}
+.us-note{background:#fff8e8;border:1px dashed #c7a34b;border-radius:14px;padding:11px;color:#665b4d;line-height:1.8;font-size:13px}
+.us-grid{display:grid;gap:12px;margin-top:14px}
+.us-field label{display:block;font-weight:900;color:#075b45;margin-bottom:6px}
+.us-field input,.us-field select,.us-field textarea{width:100%;border:1px solid #e4d4ad;border-radius:13px;background:#fff;padding:11px;color:#173d34;font:inherit}
+.us-field textarea{min-height:95px}
+.us-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+#usQr{display:grid;place-items:center;min-height:220px;background:#fff;border:1px solid #e4d4ad;border-radius:18px;padding:13px;margin-top:14px}
+.us-url{direction:ltr;text-align:left;word-break:break-all;background:#fff;border:1px dashed #c7a34b;border-radius:12px;padding:9px;font-size:11px;margin-top:10px}
+.us-ok,.us-err{margin-top:10px;border-radius:13px;padding:10px;line-height:1.7}
+.us-ok{background:#edf8f3;border:1px solid #b9dfd1}.us-err{background:#fff2ef;border:1px solid #e6b5aa}
+.us-files{display:grid;gap:9px;margin-top:8px}.us-file{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #e4d4ad;border-radius:13px;background:#fff;padding:10px}.us-file a{color:#075b45;font-weight:900;text-decoration:none}
+.us-badge{display:inline-block;padding:5px 10px;border-radius:999px;background:#f1e7cf;color:#075b45;font-size:12px;font-weight:900}
+.us-sign{width:100%;height:155px;background:#fff;border:1px dashed #c7a34b;border-radius:14px;touch-action:none}
+@media(min-width:700px){.us-grid.two{grid-template-columns:1fr 1fr}}
+
 </style>
 </head>
 <body class="cover-open">
@@ -508,7 +535,7 @@ body.cover-open{overflow:hidden}
     <button class="special-card admin-only manage-only" onclick="openApprovals()"><b>✅ اعتماد الإدارة</b><span>مراجعة • اعتماد • توقيع • ختم</span></button>
     <button class="special-card manage-only" onclick="openSurveys()"><b>📊 الاستبيانات والنتائج</b><span>أسئلة سريعة وحفظ النتائج محليًا</span></button>
     <button class="special-card manage-only" onclick="cloudInfo()"><b>☁️ السحابة والحسابات</b><span>Supabase + Microsoft • مزامنة وصلاحيات بين الأجهزة</span></button>
-    <a class="special-card link-card teacher-only manage-only" href="share2.html"><b>🔗 المشاركة بالباركود</b><span>الإدارة والأسرة • روابط خاصة • اعتماد وملاحظات</span></a>
+    <button class="special-card teacher-only manage-only" type="button" onclick="unifiedShareOpen()"><b>🔗 المشاركة بالباركود</b><span>الإدارة والأسرة • روابط خاصة • اعتماد وملاحظات</span></button>
   </div>
 </section>
 
@@ -1480,7 +1507,7 @@ async function loadShareCenterSafe(){
 }
 
 async function resolveGuestShare(token){
-  const {data,error}=await sb.rpc('resolve_share_link',{p_token:token});
+  const {data,error}=await sb.rpc('resolve_share_link_v2',{p_token:token});
   if(error) throw error;
   if(!data || data.valid!==true) throw new Error('invalid share');
   return data;
@@ -1564,5 +1591,258 @@ async function handleShareGuestLink(){
 window.addEventListener('DOMContentLoaded',()=>setTimeout(handleShareGuestLink,30));
 
 </script>
+
+<section id="usOverlay" aria-live="polite">
+  <div class="us-shell">
+    <div class="us-head">
+      <h1 id="usTitle">🔗 المشاركة بالباركود</h1>
+      <button id="usBackBtn" class="us-back" type="button" onclick="unifiedShareClose()">← العودة لملف الإنجاز</button>
+    </div>
+
+    <div id="usTeacher">
+      <div class="us-note">هذه الصفحة جزء من ملف الإنجاز نفسه. لا يتم فتح ملف ثانٍ، لذلك زر العودة يعيدك لنفس مكانك الداخلي.</div>
+      <div class="us-grid two">
+        <div class="us-field"><label>القسم</label><select id="usSection"><option value="البيانات الشخصية">1. البيانات الشخصية</option><option value="السيرة الذاتية">2. السيرة الذاتية</option><option value="الرؤية والرسالة">3. الرؤية والرسالة</option><option value="الأهداف">4. الأهداف</option><option value="الخطة السنوية">5. الخطة السنوية</option><option value="الوحدات التعليمية">6. الوحدات التعليمية</option><option value="التحضير">7. التحضير</option><option value="استراتيجيات التعليم">8. استراتيجيات التعليم</option><option value="إنجازات الأطفال">9. إنجازات الأطفال</option><option value="ملاحظات الأطفال">10. ملاحظات الأطفال</option><option value="التوجيه الصحي">11. التوجيه الصحي</option><option value="الاستبيانات">12. الاستبيانات</option><option value="التقويم الذاتي">13. التقويم الذاتي</option><option value="التقويم الخارجي">14. التقويم الخارجي</option><option value="الأداء الوظيفي">15. الأداء الوظيفي</option><option value="ملفات وشواهد">16. ملفات وشواهد</option><option value="الدورات التدريبية">17. الدورات التدريبية</option><option value="الشهادات">18. الشهادات</option><option value="الفيديوهات">19. الفيديوهات</option><option value="الصور">20. الصور</option><option value="الشراكة المجتمعية">21. الشراكة المجتمعية</option><option value="ملاحظات الإدارة">22. ملاحظات الإدارة</option><option value="ملاحظات الأسرة">23. ملاحظات الأسرة</option><option value="صورتي وشهاداتي">24. صورتي وشهاداتي</option></select></div>
+        <div class="us-field"><label>نوع الدخول</label><select id="usRole"><option value="admin">🏫 الإدارة / المشرفة — اعتماد وتوقيع</option><option value="family">👨‍👩‍👧 الأسرة / الزائرة — مشاهدة وتوصية</option></select></div>
+        <div class="us-field"><label>مدة الرابط</label><select id="usDays"><option value="1">يوم واحد</option><option value="3">3 أيام</option><option value="7" selected>7 أيام</option><option value="14">14 يومًا</option><option value="30">30 يومًا</option></select></div>
+        <div class="us-field"><label>إرفاق ملفات للمراجعة</label><input id="usFilesInput" type="file" multiple></div>
+      </div>
+      <div class="us-field" style="margin-top:12px"><label>ملاحظة للزائر (اختياري)</label><textarea id="usNote" placeholder="مثال: يرجى مراجعة الخطة واعتمادها."></textarea></div>
+      <div class="us-actions"><button class="action" type="button" onclick="unifiedCreateShare()">إنشاء الرابط والباركود</button></div>
+      <div id="usStatus"></div>
+      <div id="usQr"><span style="color:#756a5d">سيظهر الباركود هنا</span></div>
+      <div id="usUrl" class="us-url hidden"></div>
+      <div class="us-actions">
+        <button id="usCopyBtn" class="action secondary hidden" type="button" onclick="unifiedCopyShare()">نسخ الرابط</button>
+        <button id="usSendBtn" class="action secondary hidden" type="button" onclick="unifiedSendShare()">إرسال الرابط</button>
+      </div>
+    </div>
+
+    <div id="usGuest" class="hidden">
+      <span id="usGuestBadge" class="us-badge"></span>
+      <h2 id="usGuestHeading" style="color:#075b45"></h2>
+      <div id="usGuestMeta" class="us-note"></div>
+      <div class="us-field" style="margin-top:14px"><label>ملاحظة المعلمة</label><div id="usGuestNote" class="us-ok"></div></div>
+      <div class="us-field" style="margin-top:14px"><label>الملفات المرفقة</label><div id="usGuestFiles" class="us-files"></div></div>
+
+      <div id="usAdminForm" class="hidden" style="margin-top:18px">
+        <h2 style="color:#075b45">✅ اعتماد الإدارة</h2>
+        <div class="us-grid">
+          <div class="us-field"><label>الاسم</label><input id="usAdminName" placeholder="اسم المديرة / المشرفة"></div>
+          <div class="us-field"><label>الحالة</label><select id="usAdminStatus"><option value="approved">معتمد</option><option value="needs_changes">يحتاج تعديل</option></select></div>
+          <div class="us-field"><label>الملاحظة</label><textarea id="usAdminNote" placeholder="الملاحظة"></textarea></div>
+          <div class="us-field"><label>التوقيع</label><canvas id="usSignature" class="us-sign" width="700" height="220"></canvas></div>
+          <div class="us-actions"><button class="action secondary" type="button" onclick="unifiedClearSignature()">مسح التوقيع</button></div>
+          <div class="us-field"><label>الختم (اختياري)</label><input id="usStamp" type="file" accept="image/*"></div>
+          <div class="us-actions"><button class="action" type="button" onclick="unifiedSubmitApproval()">حفظ الاعتماد</button></div>
+        </div>
+      </div>
+
+      <div id="usFamilyForm" class="hidden" style="margin-top:18px">
+        <h2 style="color:#075b45">💬 مشاركة الأسرة / الزائرة</h2>
+        <div class="us-grid">
+          <div class="us-field"><label>الاسم</label><input id="usFamilyName" placeholder="الاسم"></div>
+          <div class="us-field"><label>الرأي أو التوصية</label><textarea id="usFamilyNote" placeholder="اكتبي الرأي أو التوصية"></textarea></div>
+          <div class="us-actions"><button class="action" type="button" onclick="unifiedSubmitFamily()">إرسال</button></div>
+        </div>
+      </div>
+      <div id="usGuestStatus"></div>
+    </div>
+  </div>
+</section>
+
+
+<script>
+/* ===== وظائف المشاركة داخل نفس الملف — مراجعة نهائية ===== */
+let usShareUrl='';
+let usGuestData=null;
+let usPreviousScroll=0;
+
+function usStatus(message,error=false){
+  const el=document.getElementById('usStatus');
+  if(el) el.innerHTML=message?`<div class="${error?'us-err':'us-ok'}">${message}</div>`:'';
+}
+function usGuestStatus(message,error=false){
+  const el=document.getElementById('usGuestStatus');
+  if(el) el.innerHTML=message?`<div class="${error?'us-err':'us-ok'}">${message}</div>`:'';
+}
+function unifiedShareOpen(){
+  usPreviousScroll=window.scrollY||0;
+  const overlay=document.getElementById('usOverlay');
+  document.getElementById('usTeacher')?.classList.remove('hidden');
+  document.getElementById('usGuest')?.classList.add('hidden');
+  document.getElementById('usBackBtn')?.classList.remove('hidden');
+  document.getElementById('usTitle').textContent='🔗 المشاركة بالباركود';
+
+  const sel=document.getElementById('usSection');
+  if(sel && typeof currentSection!=='undefined' && currentSection){
+    const display=(typeof sectionDisplayName==='function')?sectionDisplayName(currentSection):currentSection;
+    const found=[...sel.options].find(o=>o.value===display||o.value===currentSection);
+    if(found) sel.value=found.value;
+  }
+  overlay?.classList.add('active');
+  document.body.style.overflow='hidden';
+  overlay?.scrollTo(0,0);
+}
+function unifiedShareClose(){
+  document.getElementById('usOverlay')?.classList.remove('active');
+  document.body.style.overflow='';
+  setTimeout(()=>window.scrollTo(0,usPreviousScroll),0);
+}
+function usSafeName(name){
+  return String(name||'file').replace(/[^\w\u0600-\u06FF.\-]+/g,'_').slice(-120);
+}
+async function unifiedCreateShare(){
+  usStatus('');
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session) throw new Error('يلزم تسجيل دخول المعلمة بحساب Microsoft أولًا.');
+
+    const section=document.getElementById('usSection').value;
+    const role=document.getElementById('usRole').value;
+    const days=Number(document.getElementById('usDays').value||7);
+    const note=document.getElementById('usNote').value.trim();
+
+    const {data,error}=await sb.rpc('create_share_link',{
+      p_role:role,p_section:section,p_title:section,p_snapshot:{text:note},p_days:days
+    });
+    if(error) throw error;
+
+    const token=data.token, shareId=data.id;
+    const picked=[...(document.getElementById('usFilesInput').files||[])];
+
+    for(const file of picked){
+      const path=`${session.user.id}/${token}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${usSafeName(file.name)}`;
+      const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,file,{contentType:file.type||'application/octet-stream',upsert:false});
+      if(upErr) throw upErr;
+
+      const {data:signed,error:signedErr}=await sb.storage.from('shared-artifacts').createSignedUrl(path,days*86400);
+      if(signedErr) throw signedErr;
+
+      const {error:itemErr}=await sb.from('share_items').insert({
+        share_id:shareId,file_name:file.name,mime_type:file.type||null,public_url:signed.signedUrl,folder_name:null
+      });
+      if(itemErr) throw itemErr;
+    }
+
+    usShareUrl='https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index25.html?share='+encodeURIComponent(token);
+    const qr=document.getElementById('usQr');
+    qr.innerHTML='';
+    if(window.QRCode){
+      new QRCode(qr,{text:usShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
+    }else{
+      qr.innerHTML='<b>تم إنشاء الرابط. استخدمي زر نسخ الرابط.</b>';
+    }
+    const urlEl=document.getElementById('usUrl');
+    urlEl.textContent=usShareUrl;
+    urlEl.classList.remove('hidden');
+    document.getElementById('usCopyBtn').classList.remove('hidden');
+    document.getElementById('usSendBtn').classList.remove('hidden');
+    usStatus('تم إنشاء رابط المشاركة والباركود بنجاح.');
+  }catch(e){
+    console.error(e);
+    usStatus(e?.message||'تعذر إنشاء المشاركة.',true);
+  }
+}
+async function unifiedCopyShare(){
+  if(!usShareUrl)return;
+  await navigator.clipboard.writeText(usShareUrl);
+  usStatus('تم نسخ الرابط.');
+}
+async function unifiedSendShare(){
+  if(!usShareUrl)return;
+  if(navigator.share){
+    try{await navigator.share({title:'مشاركة من ملف الإنجاز',url:usShareUrl});return;}catch(_e){}
+  }
+  await unifiedCopyShare();
+}
+function unifiedSignatureSetup(){
+  const c=document.getElementById('usSignature');
+  if(!c||c.dataset.ready)return;
+  c.dataset.ready='1';
+  const ctx=c.getContext('2d');ctx.lineWidth=4;ctx.lineCap='round';ctx.strokeStyle='#173d34';
+  let drawing=false;
+  const point=e=>{const r=c.getBoundingClientRect(),t=e.touches?.[0]||e;return {x:(t.clientX-r.left)*(c.width/r.width),y:(t.clientY-r.top)*(c.height/r.height)};};
+  c.addEventListener('pointerdown',e=>{drawing=true;const p=point(e);ctx.beginPath();ctx.moveTo(p.x,p.y);});
+  c.addEventListener('pointermove',e=>{if(!drawing)return;const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
+  window.addEventListener('pointerup',()=>drawing=false);
+}
+function unifiedClearSignature(){
+  const c=document.getElementById('usSignature');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height);
+}
+async function usFileData(input){
+  const f=input?.files?.[0];if(!f)return null;
+  if(f.size>700000)throw new Error('صورة الختم كبيرة؛ اختاري صورة أصغر.');
+  return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(f);});
+}
+async function unifiedSubmitApproval(){
+  usGuestStatus('');
+  try{
+    const name=document.getElementById('usAdminName').value.trim();
+    if(!name)throw new Error('اكتبي اسم المديرة / المشرفة.');
+    const sig=document.getElementById('usSignature').toDataURL('image/png');
+    const stamp=await usFileData(document.getElementById('usStamp'));
+    const {error}=await sb.rpc('submit_share_response',{
+      p_token:usGuestData.token,p_type:'approval',p_name:name,
+      p_status:document.getElementById('usAdminStatus').value,
+      p_note:document.getElementById('usAdminNote').value.trim(),
+      p_signature:sig,p_stamp:stamp
+    });
+    if(error)throw error;
+    usGuestStatus('تم إرسال الاعتماد للمعلمة.',false);
+  }catch(e){console.error(e);usGuestStatus(e?.message||'تعذر حفظ الاعتماد.',true);}
+}
+async function unifiedSubmitFamily(){
+  usGuestStatus('');
+  try{
+    const note=document.getElementById('usFamilyNote').value.trim();
+    if(!note)throw new Error('اكتبي الرأي أو التوصية.');
+    const {error}=await sb.rpc('submit_share_response',{
+      p_token:usGuestData.token,p_type:'recommendation',
+      p_name:document.getElementById('usFamilyName').value.trim()||'زائرة',
+      p_status:'submitted',p_note:note,p_signature:null,p_stamp:null
+    });
+    if(error)throw error;
+    usGuestStatus('تم إرسال التوصية.',false);
+  }catch(e){console.error(e);usGuestStatus(e?.message||'تعذر الإرسال.',true);}
+}
+async function unifiedLoadGuest(){
+  const token=new URLSearchParams(location.search).get('share');
+  if(!token)return;
+  try{
+    // إظهار صفحة الضيف فوق كل شيء؛ لا يحتاج Microsoft.
+    const overlay=document.getElementById('usOverlay');
+    overlay.classList.add('active');
+    document.body.style.overflow='hidden';
+    document.getElementById('usTeacher').classList.add('hidden');
+    document.getElementById('usGuest').classList.remove('hidden');
+    document.getElementById('usBackBtn').classList.add('hidden');
+    document.getElementById('usTitle').textContent='ملف للمراجعة';
+
+    const {data,error}=await sb.rpc('resolve_share_link_v2',{p_token:token});
+    if(error)throw error;
+    if(!data?.valid)throw new Error('الرابط غير متاح أو انتهت صلاحيته.');
+    usGuestData={...data,token};
+
+    document.getElementById('usGuestBadge').textContent=data.role==='admin'?'🏫 الإدارة / المشرفة':'👨‍👩‍👧 الأسرة / الزائرة';
+    document.getElementById('usGuestHeading').textContent=data.title||'ملف للمراجعة';
+    document.getElementById('usGuestMeta').textContent='صالح حتى: '+new Date(data.expires_at).toLocaleString('ar-SA');
+    document.getElementById('usGuestNote').textContent=data.snapshot?.text||'لا توجد ملاحظة.';
+    const files=data.items||[];
+    document.getElementById('usGuestFiles').innerHTML=files.length
+      ? files.map(f=>`<div class="us-file"><b>${String(f.file_name||'ملف').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}</b><a href="${f.public_url}" target="_blank" rel="noopener">فتح الملف</a></div>`).join('')
+      : '<div class="us-ok">لا توجد ملفات مرفقة.</div>';
+
+    document.getElementById('usAdminForm').classList.toggle('hidden',data.role!=='admin');
+    document.getElementById('usFamilyForm').classList.toggle('hidden',data.role!=='family');
+    if(data.role==='admin')unifiedSignatureSetup();
+  }catch(e){
+    console.error(e);
+    document.getElementById('usGuest').innerHTML=`<div class="us-err">${e?.message||'تعذر فتح الرابط.'}</div>`;
+  }
+}
+window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
+</script>
+
 </body>
 </html>
