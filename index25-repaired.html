@@ -1,0 +1,1568 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="apple-touch-icon" href="145B5362-D3F2-4B6C-8F20-1C956385604D.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<script>
+async function applySupabaseRole(){
+  try{
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session) return;
+
+    const { data: profile, error } = await sb
+      .from('profiles')
+      .select('role, full_name')
+      .eq('id', session.user.id)
+      .maybeSingle();
+
+    if(error){
+      console.error('Profile role load error:', error);
+      return;
+    }
+    if(!profile) return;
+
+    const role = profile.role || 'family';
+
+    // Preserve the existing role system already used by the portfolio.
+    const roleSelect = document.getElementById('roleSelect');
+    if(roleSelect){
+      const allowed = Array.from(roleSelect.options || []).map(o=>o.value);
+      if(allowed.includes(role)) roleSelect.value = role;
+    }
+
+    // Existing app role variable / role application.
+    if(typeof window.currentRole !== 'undefined') window.currentRole = role;
+    if(typeof applyRole === 'function'){
+      try{ applyRole(role); }catch(_){ try{ applyRole(); }catch(__){} }
+    }
+
+    document.body.dataset.supabaseRole = role;
+    window.supabaseUserRole = role;
+    window.supabaseProfile = profile;
+  }catch(err){
+    console.error('Supabase role init error:', err);
+  }
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  setTimeout(applySupabaseRole, 0);
+});
+
+if(window.sb && sb.auth){
+  sb.auth.onAuthStateChange((event, session)=>{
+    if(session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')){
+      setTimeout(applySupabaseRole, 0);
+    }
+  });
+}
+</script>
+  <title>ملف الإنجاز المهني — v25</title>
+<style>
+:root{
+  --green:#075b45;--green2:#0d6a54;--green3:#164f42;--gold:#c7a34b;--gold2:#e3c97b;
+  --cream:#f8f1e5;--cream2:#fffaf2;--card:#fffdf8;--text:#173d34;--muted:#756a5d;
+  --line:#e4d4ad;--danger:#9d3f3f;--shadow:0 12px 34px rgba(68,48,18,.10)
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--cream);font-family:"Geeza Pro","Noto Naskh Arabic","Tahoma",Arial,sans-serif;color:var(--text)}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+body.cover-open{overflow:hidden}
+.hidden{display:none!important}
+
+/* الغلاف: محفوظ كما هو */
+#cover{position:fixed;inset:0;z-index:80;width:100%;height:100dvh;overflow:hidden;background:#f8f1e5}
+.cover-image{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block}
+.cover-shade{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 74%,rgba(248,241,229,.25) 86%,rgba(248,241,229,.82) 100%);pointer-events:none}
+.enter-btn{position:absolute;z-index:2;left:50%;bottom:12px;transform:translateX(-50%);min-width:280px;max-width:86vw;border:2px solid var(--gold);border-radius:999px;background:var(--green);color:white;padding:12px 24px;font-size:20px;font-weight:800;box-shadow:0 8px 22px #0002}
+
+/* الصفحة الداخلية: الصورة والتوزيع الأساسي محفوظان */
+#portfolio{display:none;min-height:100dvh;background:var(--cream);padding-bottom:52px}
+.home-btn{position:fixed;z-index:35;top:max(14px,env(safe-area-inset-top));left:14px;width:56px;height:56px;border-radius:50%;border:2px solid var(--gold);background:var(--green);color:#fff;font-size:27px;box-shadow:0 5px 14px #0002}
+.inner-hero{width:100%;margin:0;padding:0;background:var(--cream);overflow:hidden}
+.inner-img{display:block;width:100%;height:auto;margin:0;padding:0}
+.section-heading{width:min(94%,920px);margin:22px auto 12px;text-align:center;color:var(--green);font-size:24px;font-weight:900}
+.section-heading:after{content:"";display:block;width:100px;height:2px;background:var(--gold);margin:8px auto 0}
+
+.viewer-bar{width:min(94%,920px);margin:0 auto 16px;padding:10px 12px;background:rgba(255,253,248,.82);border:1px solid var(--line);border-radius:18px;display:flex;gap:10px;align-items:center;justify-content:space-between;box-shadow:0 5px 18px rgba(95,69,23,.06)}
+.viewer-bar label{font-size:13px;color:var(--muted)}
+.viewer-bar select{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;color:var(--green);font-weight:800}
+.viewer-note{font-size:11px;color:var(--muted)}
+
+.sections{width:min(94%,920px);margin:0 auto 24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.card{border:1.5px solid #d8b96f;border-radius:22px;background:rgba(255,250,242,.97);padding:13px 11px;min-height:108px;display:flex;align-items:center;gap:10px;text-align:right;color:var(--green);box-shadow:0 5px 14px rgba(95,69,23,.08);transition:.18s ease}
+.card:active{transform:scale(.985)}
+.icon{flex:0 0 45px;width:45px;height:45px;border-radius:50%;display:grid;place-items:center;background:var(--green);color:#f0d47e;border:2px solid var(--gold);font-size:21px}.copy{min-width:0}.title{font-size:16px;font-weight:900;line-height:1.4}.num{color:var(--gold);font-weight:900;margin-left:4px}.desc{display:block;color:var(--muted);font-size:11px;line-height:1.45;margin-top:4px}
+
+.specials{width:min(94%,920px);margin:0 auto 38px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.special-card{background:linear-gradient(145deg,#fffdf8,#f7eddc);border:1px solid var(--line);border-radius:18px;padding:14px;min-height:82px;text-align:right;color:var(--green);box-shadow:0 5px 16px rgba(95,69,23,.07)}
+.special-card b{display:block;font-size:14px}.special-card span{font-size:11px;color:var(--muted);display:block;margin-top:5px}
+
+/* صفحات الأقسام */
+.panel{display:none;position:fixed;inset:0;z-index:60;background:radial-gradient(circle at top,#fffaf2 0,#f8f1e5 55%);overflow:auto;padding:max(74px,calc(env(safe-area-inset-top) + 64px)) 14px 34px}
+.panel.active{display:block}
+.panel-box{max-width:900px;margin:auto;background:rgba(255,253,248,.98);border:1.5px solid #d8b96f;border-radius:26px;padding:18px;box-shadow:var(--shadow)}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:-56px;background:rgba(255,253,248,.96);backdrop-filter:blur(10px);z-index:5;padding:2px 0 10px;border-bottom:1px solid #efe4c8}
+.back{border:0;border-radius:999px;background:var(--green);color:#fff;padding:10px 17px;font-weight:800}
+.panel h2{color:var(--green);margin:18px 0 6px;font-size:25px}.panel p{color:var(--muted);line-height:1.8;margin-top:0}
+.editor{width:100%;min-height:126px;border:1px solid #d8c79d;border-radius:16px;padding:12px;background:white;color:var(--text);resize:vertical;outline:none}.editor:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(199,163,75,.12)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.action{border:1px solid var(--gold);border-radius:999px;background:var(--green);color:white;padding:9px 14px;font-weight:800}.action.secondary{background:#fff;color:var(--green)}.action.danger{background:#fff;color:var(--danger);border-color:#d9aaaa}.upload{display:inline-block;cursor:pointer}.upload input{display:none}
+
+.section-block{margin-top:22px}.block-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}.block-title h3{margin:0;color:var(--green);font-size:18px}.block-title small{color:var(--muted)}
+
+/* المجلدات */
+.folders-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.folders-toolbar input,.folders-toolbar select{border:1px solid var(--line);border-radius:999px;background:#fff;padding:8px 11px;color:var(--text);max-width:170px}
+.folders-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.folder-card{position:relative;overflow:hidden;min-height:150px;border:1px solid rgba(199,163,75,.72);border-radius:23px;padding:0;text-align:right;color:#fff;box-shadow:0 10px 24px rgba(53,42,19,.12);isolation:isolate;transition:.18s ease}
+.folder-card:active{transform:scale(.985)}
+.folder-cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}.folder-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.05),rgba(0,0,0,.52));z-index:-1}
+.folder-card.no-cover .folder-shade{background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(0,0,0,.13))}
+.folder-body{min-height:150px;display:flex;flex-direction:column;justify-content:flex-end;padding:14px}
+.folder-icon{font-size:38px;line-height:1;margin-bottom:auto;padding-top:4px;filter:drop-shadow(0 2px 3px #0002)}
+.folder-name{font-size:17px;font-weight:900;text-shadow:0 1px 2px #0004}.folder-meta{font-size:10px;opacity:.92;margin-top:4px;display:flex;gap:7px;flex-wrap:wrap}
+.folder-menu{position:absolute;top:8px;left:8px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.55);background:rgba(0,0,0,.22);color:#fff;font-size:20px;display:grid;place-items:center;z-index:2}
+.empty-state{border:1px dashed #d7c497;border-radius:18px;padding:22px;text-align:center;color:var(--muted);background:rgba(255,255,255,.55)}
+
+/* ملفات القسم والجذر */
+.gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.gallery img,.gallery video{width:100%;height:170px;object-fit:cover;border-radius:15px;border:1px solid #e1d3b0;background:#fff}
+.files-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.files-grid.list-view{grid-template-columns:1fr}
+.file-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:11px;min-width:0;box-shadow:0 4px 12px rgba(95,69,23,.05)}
+.file-preview{height:110px;border-radius:12px;background:#f8f3e9;display:grid;place-items:center;overflow:hidden;margin-bottom:9px}.file-preview img,.file-preview video{width:100%;height:100%;object-fit:cover}.file-emoji{font-size:42px}.file-name{font-weight:800;color:var(--green);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.file-meta{font-size:10px;color:var(--muted);margin-top:3px}.file-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}.mini{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 9px;color:var(--green);font-size:11px}.mini.danger{color:var(--danger)}
+.share-print-note{font-size:11px;color:var(--muted);margin-top:8px}.print-sheet{font-family:"Geeza Pro","Noto Naskh Arabic",Tahoma,Arial,sans-serif;direction:rtl;color:#173d34;padding:24px}.print-sheet h1,.print-sheet h2{color:#075b45}.print-sheet .meta{color:#756a5d;font-size:13px}.print-sheet .box{border:1px solid #e4d4ad;border-radius:14px;padding:14px;margin:12px 0}.print-sheet ul{line-height:1.9}
+
+/* عرض المجلد */
+.folder-view{display:none}.folder-view.active{display:block}
+.folder-view-head{border-radius:22px;padding:16px;color:#fff;position:relative;overflow:hidden;min-height:120px;display:flex;align-items:flex-end;margin-top:10px;box-shadow:0 8px 20px #0001}.folder-view-head img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}.folder-view-head:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.06),rgba(0,0,0,.52));z-index:1}.folder-head-copy{position:relative;z-index:2}.folder-view-title{font-size:24px;font-weight:900}.folder-view-sub{font-size:11px;opacity:.92;margin-top:4px}
+.folder-tools{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.folder-tools input,.folder-tools select{border:1px solid var(--line);border-radius:999px;background:#fff;padding:8px 11px;max-width:180px}
+
+/* النوافذ */
+.modal{display:none;position:fixed;inset:0;z-index:120;background:rgba(19,35,29,.52);padding:20px;overflow:auto}.modal.open{display:grid;place-items:center}.modal-card{width:min(100%,620px);background:#fffdf8;border:1px solid var(--line);border-radius:24px;padding:18px;box-shadow:0 22px 60px #0003}.modal-card h3{margin:0 0 12px;color:var(--green);font-size:22px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.field label{font-size:12px;color:var(--muted);font-weight:800}.field input,.field textarea,.field select{width:100%;border:1px solid var(--line);border-radius:13px;background:#fff;padding:10px;color:var(--text)}.field textarea{min-height:95px;resize:vertical}.color-row{display:flex;gap:8px;align-items:center}.color-row input[type=color]{height:44px;padding:3px}.preview-box{height:110px;border-radius:16px;border:1px dashed var(--line);display:grid;place-items:center;background:#faf5ea;overflow:hidden}.preview-box img{width:100%;height:100%;object-fit:cover}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap}
+
+/* التفاعل */
+.feed{display:grid;gap:9px}.feed-item{border:1px solid var(--line);border-radius:15px;background:#fff;padding:11px}.feed-item strong{color:var(--green)}.feed-item small{color:var(--muted)}.tag{display:inline-block;border-radius:999px;background:#f1e7cf;color:var(--green);padding:3px 8px;font-size:10px;font-weight:800;margin-left:5px}
+.approval-badge{display:inline-flex;gap:5px;align-items:center;border:1px solid #c9b06c;border-radius:999px;padding:5px 9px;background:#fff8df;color:#6c5721;font-size:11px;font-weight:800}
+.toast{display:none;position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:200;background:#173f36;color:#fff;border:1px solid var(--gold);border-radius:999px;padding:10px 16px;box-shadow:0 10px 30px #0002;font-size:13px}.toast.show{display:block}
+
+@media(max-width:430px){
+ .enter-btn{min-width:250px;font-size:18px}.sections{gap:9px}.card{min-height:102px;padding:10px 8px;gap:8px}.icon{width:41px;height:41px;flex-basis:41px;font-size:19px}.title{font-size:14px}.desc{font-size:10px}.section-heading{font-size:21px}
+ .panel{padding-left:10px;padding-right:10px}.panel-box{padding:14px;border-radius:22px}.folders-grid{gap:9px}.folder-card,.folder-body{min-height:140px}.folder-name{font-size:15px}.gallery img,.gallery video{height:140px}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.specials{grid-template-columns:1fr 1fr}.viewer-note{display:none}
+}
+@media(min-width:700px){.sections{grid-template-columns:repeat(3,minmax(0,1fr))}.folders-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.files-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.specials{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.upload-status{margin:10px 0;padding:9px 12px;border:1px dashed var(--gold);border-radius:12px;background:#fffaf2;color:var(--green);font-size:13px;display:none}.upload-status.show{display:block}
+.upload-hint{width:100%;font-size:12px;color:#6f6558;margin-top:4px}.upload-choice{display:inline-flex;align-items:center;gap:6px}.upload-debug{width:100%;margin-top:8px;padding:10px 12px;border:1px solid #e1d3b0;border-radius:12px;background:#fff;color:var(--green);font-size:12px;line-height:1.6}.upload-debug b{color:#075b45}
+.hint-ios-files{margin-top:8px;font-size:12px;color:#6f6558;background:#fff8e8;border:1px dashed #d8b96f;border-radius:12px;padding:8px 10px}
+
+/* v11: عرض عام متجاوب للآيباد واللابتوب والزوار */
+.public-banner{
+  width:min(94%,1180px);margin:0 auto 16px;padding:13px 15px;
+  background:linear-gradient(145deg,#fffdf8,#f5ead5);
+  border:1px solid var(--line);border-radius:18px;color:var(--green);
+  box-shadow:0 5px 18px rgba(95,69,23,.06);font-size:13px;line-height:1.8
+}
+.public-banner b{font-size:14px}
+.public-fab{
+  position:fixed;z-index:55;right:16px;bottom:max(18px,env(safe-area-inset-bottom));
+  border:2px solid var(--gold);border-radius:999px;background:var(--green);
+  color:#fff;padding:11px 16px;font-weight:900;box-shadow:0 8px 22px #0002
+}
+.editable-field[readonly]{background:#fffdf8;color:var(--text);cursor:default}
+.public-view .teacher-only{display:none!important}
+.public-view .admin-only{display:none!important}
+.public-view .manage-only{display:none!important}
+.public-view .viewer-bar{display:none!important}
+.public-view .file-actions .teacher-only{display:none!important}
+
+@media(min-width:700px){
+  .panel-box{max-width:1040px}
+}
+@media(min-width:900px){
+  .sections{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .folders-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .files-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .specials{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .panel-box{padding:24px}
+}
+@media(min-width:1200px){
+  .section-heading,.viewer-bar,.sections,.specials,.public-banner{width:min(92%,1180px)}
+  .sections{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .folders-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .files-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .panel-box{max-width:1180px}
+  .card{min-height:118px;padding:16px}
+  .title{font-size:17px}.desc{font-size:12px}
+}
+
+
+/* v12: تنقية واجهة الزائر */
+.public-view .folders-toolbar{display:none!important}
+.public-view .editable-field:placeholder-shown{display:none!important}
+.public-view .editable-field:not(:placeholder-shown){
+  display:block!important;
+  min-height:auto;
+  padding:16px 18px;
+  border:1px solid #dfc98f;
+  border-radius:18px;
+  background:linear-gradient(145deg,#fffdf8,#fbf4e8);
+  color:var(--text);
+  line-height:1.9;
+  box-shadow:0 5px 14px rgba(95,69,23,.05);
+  resize:none;
+}
+.public-view #rootFilesHint{display:none!important}
+.public-view .section-block{margin-top:18px}
+.public-view .block-title{margin-bottom:10px}
+
+
+/* v13 — الشريط الأخضر الجانبي: فهرس الأقسام والمجلدات */
+.side-rail{
+  position:fixed;
+  top:0;right:0;bottom:0;
+  width:9px;
+  background:linear-gradient(180deg,var(--green),#0b6a52 68%,var(--green));
+  box-shadow:-2px 0 8px rgba(7,91,69,.13);
+  z-index:78;
+}
+.side-nav-toggle{
+  position:fixed;
+  right:9px;
+  top:48%;
+  transform:translateY(-50%);
+  z-index:82;
+  width:46px;height:86px;
+  border:1.5px solid var(--gold);
+  border-right:0;
+  border-radius:22px 0 0 22px;
+  background:var(--green);
+  color:#fff;
+  display:grid;place-items:center;
+  font-size:23px;font-weight:900;
+  box-shadow:-5px 7px 18px #0002;
+}
+.side-nav{
+  position:fixed;
+  z-index:81;
+  top:0;right:0;bottom:0;
+  width:min(86vw,390px);
+  background:linear-gradient(180deg,#fffdf7,#f8f0e2);
+  border-left:2px solid var(--gold);
+  box-shadow:-14px 0 34px rgba(23,61,52,.18);
+  transform:translateX(102%);
+  transition:transform .26s ease;
+  display:flex;flex-direction:column;
+  padding-top:max(14px,env(safe-area-inset-top));
+}
+.side-nav.open{transform:translateX(0)}
+.side-nav-head{
+  background:var(--green);
+  color:#fff;
+  padding:17px 17px 15px;
+  border-bottom:2px solid var(--gold);
+}
+.side-nav-head-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.side-nav-title{font-size:20px;font-weight:900}
+.side-nav-sub{margin-top:5px;font-size:12px;color:#f5e8be;line-height:1.7}
+.side-nav-close{
+  border:1px solid #ffffff70;background:#ffffff16;color:white;
+  width:38px;height:38px;border-radius:50%;font-size:23px
+}
+.side-nav-search-wrap{padding:12px;background:#fffaf2;border-bottom:1px solid #ead9aa}
+.side-nav-search{
+  width:100%;border:1px solid #d8c79d;border-radius:999px;
+  padding:10px 14px;background:white;font:inherit;color:var(--text)
+}
+.side-nav-list{overflow:auto;overscroll-behavior:contain;padding:8px 10px 24px}
+.side-sec{
+  border:1px solid #dec98f;border-radius:17px;background:#fffaf3;
+  margin:8px 0;overflow:hidden;box-shadow:0 4px 10px rgba(95,69,23,.05)
+}
+.side-sec-head{
+  width:100%;border:0;background:transparent;color:var(--green);
+  padding:11px 12px;display:grid;grid-template-columns:auto 1fr auto;
+  gap:9px;align-items:center;text-align:right
+}
+.side-sec-icon{
+  width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
+  background:var(--green);color:#f3d778;border:1px solid var(--gold);font-size:17px
+}
+.side-sec-copy{min-width:0}
+.side-sec-name{display:block;font-weight:900;font-size:14px;line-height:1.35}
+.side-sec-meta{display:block;color:var(--muted);font-size:10px;margin-top:3px}
+.side-sec-chevron{color:var(--gold);font-size:16px;transition:transform .2s}
+.side-sec.expanded .side-sec-chevron{transform:rotate(90deg)}
+.side-folders{display:none;border-top:1px dashed #dfca92;padding:5px 8px 9px;background:#fffdf9}
+.side-sec.expanded .side-folders{display:block}
+.side-folder{
+  width:100%;border:0;background:transparent;color:var(--text);
+  padding:9px 8px;border-radius:12px;display:flex;align-items:center;gap:8px;
+  text-align:right;font:inherit
+}
+.side-folder:hover,.side-folder:focus{background:#f4ead6}
+.side-folder-icon{font-size:18px;flex:0 0 24px;text-align:center}
+.side-folder-name{flex:1;min-width:0;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.side-folder-count{font-size:10px;color:var(--muted)}
+.side-no-folder{padding:9px 10px;color:var(--muted);font-size:11px;text-align:center}
+.side-nav-overlay{
+  position:fixed;inset:0;z-index:80;background:#102f2938;
+  backdrop-filter:blur(1px);display:none
+}
+.side-nav-overlay.show{display:block}
+
+@media(min-width:900px){
+  .side-nav{width:390px}
+  .side-nav-toggle{width:48px;height:92px}
+}
+
+
+/* v14 — ألوان راقية للفهرس الجانبي مع الحفاظ على نموذج المعلمة */
+.side-sec:nth-child(8n+1){background:linear-gradient(145deg,#fffaf2,#eef7f2);border-color:#b9d7ca}
+.side-sec:nth-child(8n+2){background:linear-gradient(145deg,#fffaf2,#fbf0dc);border-color:#e0c58b}
+.side-sec:nth-child(8n+3){background:linear-gradient(145deg,#fffaf2,#f7ecef);border-color:#ddb9c2}
+.side-sec:nth-child(8n+4){background:linear-gradient(145deg,#fffaf2,#edf3fa);border-color:#b9cce0}
+.side-sec:nth-child(8n+5){background:linear-gradient(145deg,#fffaf2,#f0edf8);border-color:#c9bee0}
+.side-sec:nth-child(8n+6){background:linear-gradient(145deg,#fffaf2,#f7f1df);border-color:#ddcf9f}
+.side-sec:nth-child(8n+7){background:linear-gradient(145deg,#fffaf2,#edf7f5);border-color:#b8d9d2}
+.side-sec:nth-child(8n+8){background:linear-gradient(145deg,#fffaf2,#f7eee6);border-color:#dfc2a7}
+
+.side-sec:nth-child(8n+1) .side-sec-icon{background:#2f6b5c}
+.side-sec:nth-child(8n+2) .side-sec-icon{background:#9b7a34}
+.side-sec:nth-child(8n+3) .side-sec-icon{background:#9a6674}
+.side-sec:nth-child(8n+4) .side-sec-icon{background:#5f7898}
+.side-sec:nth-child(8n+5) .side-sec-icon{background:#77678f}
+.side-sec:nth-child(8n+6) .side-sec-icon{background:#8d7c4b}
+.side-sec:nth-child(8n+7) .side-sec-icon{background:#4f7f78}
+.side-sec:nth-child(8n+8) .side-sec-icon{background:#956f54}
+
+.side-folder{
+  margin:3px 0;
+  border:1px solid transparent;
+  transition:.18s ease;
+}
+.side-folder:hover,.side-folder:focus{
+  background:#fff;
+  border-color:#dec98f;
+  box-shadow:0 4px 12px rgba(95,69,23,.07);
+}
+.side-nav-head{
+  background:linear-gradient(135deg,#075b45,#0b7057 60%,#987b37);
+}
+.side-nav-search{
+  box-shadow:inset 0 1px 0 #ffffff90,0 4px 12px rgba(95,69,23,.05);
+}
+
+
+/* v15 — إصلاح ظهور المجلدات داخل القسم */
+.public-view #foldersArea{display:grid!important}
+.public-view .folder-card{display:block!important}
+.public-view .folder-menu{display:none!important}
+
+
+/* v16 — إظهار الأقسام السفلية للزائر بشكل واضح */
+.public-view .specials{display:grid!important}
+.public-view .special-card{display:block!important;opacity:1}
+.public-view .special-card.manage-only,
+.public-view .special-card.admin-only{
+  display:block!important;
+}
+.public-view .special-card.manage-only::after,
+.public-view .special-card.admin-only::after{
+  content:"عرض فقط";
+  display:inline-block;
+  margin-top:7px;
+  padding:3px 8px;
+  border-radius:999px;
+  background:#f3ead5;
+  color:var(--green);
+  border:1px solid #dec98f;
+  font-size:10px;
+  font-weight:800;
+}
+
+
+/* v17 — صلاحيات ظاهرة دائمًا للمعلمة + شريط أخضر كامل ومقبض بيج */
+.role-section{width:min(94%,980px);margin:0 auto 18px}
+.role-cards{display:grid;grid-template-columns:1fr;gap:10px}
+.role-card{
+  border:1.5px solid #d7bd78;border-radius:20px;background:linear-gradient(145deg,#fffdf8,#f8f0df);
+  padding:14px 12px;text-align:center;color:var(--green);box-shadow:0 5px 14px rgba(80,60,20,.06);
+  font:inherit;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center
+}
+.role-card .role-emoji{font-size:26px}.role-card b{font-size:15px}.role-card span:not(.role-emoji){font-size:12px;font-weight:800;color:#8a6b29}.role-card small{font-size:10px;color:var(--muted);line-height:1.5}
+.role-card.active{background:linear-gradient(145deg,#0b6f57,#095d49);color:#fff;border-color:#d8b85f;box-shadow:0 7px 18px rgba(7,91,69,.18)}
+.role-card.active span:not(.role-emoji),.role-card.active small{color:#f4e4b6}
+.role-hint{margin-top:10px;padding:10px 12px;border-radius:14px;background:#fffaf1;border:1px dashed #d8c38a;color:var(--green);font-size:12px;font-weight:800;text-align:center;line-height:1.7}
+@media(min-width:700px){.role-cards{grid-template-columns:repeat(3,1fr)}}
+
+.side-rail{background:#0b6f57!important}
+.side-nav{background:linear-gradient(180deg,#0b6f57,#095d49)!important;border-left:2px solid #d7b85f!important}
+.side-nav-head{background:#075b45!important}
+.side-nav-search-wrap{background:#0b6f57!important;border-bottom:1px solid #d7b85f!important}
+.side-nav-list{background:#0b6f57!important}
+.side-sec{background:#fffaf2!important;border-color:#d7bd78!important}
+.side-sec:nth-child(n) .side-sec-icon{background:#0b6f57!important}
+.side-folders{background:#fffdf8!important}
+.side-nav-toggle{background:#ead9b5!important;color:#0b6f57!important;border-color:#cba652!important;box-shadow:-5px 7px 18px #0002!important}
+.side-nav-toggle:hover,.side-nav-toggle:focus{background:#f2e5c8!important}
+
+
+.public-view .role-card{pointer-events:none;opacity:.78}
+.public-view #roleTeacherCard,.public-view #roleAdminCard{display:none!important}
+.public-view #roleFamilyCard{display:flex!important;opacity:1}
+.public-view .role-cards{grid-template-columns:1fr}
+
+
+/* v22: مشاركة الإدارة والأسرة برابط/باركود */
+.share-guest{display:none;position:fixed;inset:0;z-index:500;background:linear-gradient(180deg,#fffaf2,#f7eddc);overflow:auto;padding:20px 14px 60px}
+.share-guest.active{display:block}
+.share-shell{width:min(94%,850px);margin:auto;background:#fffdf8;border:1.5px solid var(--gold);border-radius:24px;padding:18px;box-shadow:var(--shadow)}
+.share-shell h1{color:var(--green);font-size:24px;margin:0 0 6px}
+.share-shell h2{color:var(--green);font-size:18px;margin:22px 0 10px}
+.share-meta{color:var(--muted);font-size:12px;line-height:1.8}
+.share-text{white-space:pre-wrap;background:#fffaf1;border:1px solid var(--line);border-radius:15px;padding:13px;line-height:1.9}
+.share-files{display:grid;grid-template-columns:1fr;gap:9px}
+.share-file{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px}
+.share-file a{color:var(--green);font-weight:900;text-decoration:none;word-break:break-word}
+.share-form{display:grid;gap:10px}
+.share-form input,.share-form textarea,.share-form select{width:100%;border:1px solid var(--line);border-radius:13px;padding:10px;background:#fff;color:var(--text)}
+.share-form textarea{min-height:100px}
+.qr-box{display:grid;place-items:center;min-height:220px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;margin:12px 0}
+.qr-link{font-size:11px;direction:ltr;text-align:left;word-break:break-all;border:1px dashed var(--line);border-radius:12px;padding:8px;background:#fff}
+.signature-canvas{width:100%;height:150px;border:1px dashed var(--gold);border-radius:14px;background:#fff;touch-action:none}
+.share-role-badge{display:inline-block;padding:5px 10px;border-radius:999px;background:#f1e7cf;color:var(--green);font-size:11px;font-weight:900}
+.share-card{border:1px solid var(--line);border-radius:15px;background:#fff;padding:11px;margin:8px 0}
+@media(min-width:700px){.share-files{grid-template-columns:1fr 1fr}}
+
+
+/* v25: فتح نافذة الباركود بدون الاعتماد على JavaScript */
+.modal:target{display:grid!important;place-items:center}
+.special-card.link-card{display:block;text-decoration:none}
+
+</style>
+</head>
+<body class="cover-open">
+<section id="cover">
+  <img class="cover-image" src="44F296E0-44F3-469A-BCBB-ED3C3F4DB337.png" alt="غلاف ملف الإنجاز">
+  <div class="cover-shade"></div>
+  <button class="enter-btn" type="button" onclick="signInWithMicrosoft()">الدخول إلى ملف الإنجاز</button>
+</section>
+
+<section id="portfolio">
+  <button class="home-btn" type="button" onclick="goCover()" aria-label="العودة للغلاف">⌂</button>
+  <div class="inner-hero"><img class="inner-img" src="3inner-main.jpg" alt="الواجهة الداخلية"></div>
+  <div class="section-heading">أقسام ملف الإنجاز التفاعلية — ٢٤ قسمًا</div>
+  <div class="sections" id="sections"></div>
+
+  <div id="publicBanner" class="public-banner hidden">
+    <b>👀 وضع المشاهدة العامة</b><br>
+    يمكنك الاطلاع على محتوى ملف الإنجاز وفتح الأقسام والمجلدات والملفات، بدون صلاحية تعديل أو حذف أو رفع ملفات.
+    لإضافة رأي أو توصية استخدمي زر <b>💬 أضف رأيك</b>.
+  </div>
+
+  <div class="role-section" id="roleSection">
+    <div class="section-heading" style="font-size:19px;margin-top:18px">الدخول والصلاحيات</div>
+    <div class="role-cards">
+      <button class="role-card active" id="roleTeacherCard" type="button" onclick="setRole('teacher')">
+        <span class="role-emoji">👩‍🏫</span><b>المعلمة</b><span>صلاحية كاملة</span><small>إضافة • تعديل • رفع • حذف • إدارة المجلدات</small>
+      </button>
+      <button class="role-card" id="roleAdminCard" type="button" onclick="setRole('admin')">
+        <span class="role-emoji">🏫</span><b>الإدارة / المشرفة</b><span>مراجعة واعتماد</span><small>ملاحظات • اعتماد • توقيع • ختم</small>
+      </button>
+      <button class="role-card" id="roleFamilyCard" type="button" onclick="setRole('family')">
+        <span class="role-emoji">👨‍👩‍👧</span><b>الأسرة / الزائرة</b><span>مشاهدة ومشاركة</span><small>اطلاع • رأي • توصية فقط</small>
+      </button>
+    </div>
+    <div id="roleHint" class="role-hint">👩‍🏫 المعلمة — صلاحية كاملة: إضافة وتعديل وحذف ورفع وإدارة المجلدات.</div>
+    <select id="roleSelect" class="hidden" onchange="applyRole()">
+      <option value="teacher">المعلمة</option>
+      <option value="admin">الإدارة / المشرفة</option>
+      <option value="family">الأسرة / الزائرة</option>
+    </select>
+  </div>
+
+  <div class="section-heading" style="font-size:19px">التفاعل والمتابعة</div>
+
+  <div class="side-rail" aria-hidden="true"></div>
+  <button class="side-nav-toggle" id="sideNavToggle" type="button" onclick="toggleSideNav()" aria-label="فتح فهرس الأقسام">☰</button>
+  <div class="side-nav-overlay" id="sideNavOverlay" onclick="closeSideNav()"></div>
+  <aside class="side-nav" id="sideNav" aria-label="فهرس ملف الإنجاز">
+    <div class="side-nav-head">
+      <div class="side-nav-head-row">
+        <div>
+          <div class="side-nav-title">فهرس ملف الإنجاز</div>
+          <div class="side-nav-sub">الأقسام الـ24 والمجلدات الموجودة داخل كل قسم</div>
+        </div>
+        <button class="side-nav-close" type="button" onclick="closeSideNav()" aria-label="إغلاق">×</button>
+      </div>
+    </div>
+    <div class="side-nav-search-wrap">
+      <input id="sideNavSearch" class="side-nav-search" type="search" placeholder="بحث في الأقسام والمجلدات..." oninput="renderSideNav()">
+    </div>
+    <div class="side-nav-list" id="sideNavList"></div>
+  </aside>
+
+  <div class="specials">
+    <button class="special-card" onclick="openRecommendations()"><b>💬 الاقتراحات والتوصيات</b><span>الإدارة • المشرفات • الأسر • الزائرات</span></button>
+    <button class="special-card admin-only manage-only" onclick="openApprovals()"><b>✅ اعتماد الإدارة</b><span>مراجعة • اعتماد • توقيع • ختم</span></button>
+    <button class="special-card manage-only" onclick="openSurveys()"><b>📊 الاستبيانات والنتائج</b><span>أسئلة سريعة وحفظ النتائج محليًا</span></button>
+    <button class="special-card manage-only" onclick="cloudInfo()"><b>☁️ السحابة والحسابات</b><span>Supabase + Microsoft • مزامنة وصلاحيات بين الأجهزة</span></button>
+    <a class="special-card link-card teacher-only manage-only" href="share2.html"><b>🔗 المشاركة بالباركود</b><span>الإدارة والأسرة • روابط خاصة • اعتماد وملاحظات</span></a>
+  </div>
+</section>
+
+<!-- صفحة القسم -->
+<div class="panel" id="panel"><div class="panel-box">
+  <div class="panel-head">
+    <button class="back" onclick="closePanel()">← العودة للأقسام</button>
+    <span id="sectionApprovalBadge"></span>
+  </div>
+  <div id="sectionMain">
+    <h2 id="panelTitle"></h2><p id="panelDesc"></p>
+    <textarea class="editor editable-field" id="editor" placeholder="اكتبي محتوى هذا القسم هنا..."></textarea>
+    <div class="actions teacher-only">
+      <button class="action" onclick="saveText()">💾 حفظ النص</button>
+      <label class="action upload upload-choice">📄 مستند / ملف<input id="fileInput" type="file" onchange="addRootFiles(event)"></label>
+      <label class="action upload upload-choice">🖼️ صور / فيديو<input id="rootMediaInput" type="file" accept="image/*,video/*" multiple onchange="addRootFiles(event)"></label>
+      <button class="action" type="button" onclick="openFolderEditor()">＋ إنشاء مجلد</button>
+      <button class="action secondary" type="button" onclick="renameCurrentSection()">✏️ تعديل مسمى القسم</button>
+      <button class="action secondary admin-only manage-only" onclick="openSectionApprovalForm()">📨 إرسال للاعتماد</button>
+      <button class="action secondary" type="button" onclick="openSectionSurvey()">📊 استبيان هذا القسم</button>
+      <button class="action secondary" type="button" onclick="shareCurrentSection()">📤 إرسال القسم</button>
+      <button class="action secondary teacher-only" type="button" onclick="openShareBuilderSafe()">🔗 باركود للإدارة / الأسرة</button>
+      <button class="action secondary" type="button" onclick="printCurrentSection()">🖨️ طباعة القسم</button>
+      <button class="action danger" onclick="clearSection()">حذف محتوى القسم</button>
+    </div>
+
+    <div class="section-block">
+      <div class="block-title"><h3>📁 المجلدات</h3><small id="folderCountText"></small></div>
+      <div class="folders-toolbar">
+        <input id="folderSearch" placeholder="بحث في المجلدات" oninput="renderFolders()">
+        <select id="folderSort" onchange="renderFolders()"><option value="custom">ترتيبي</option><option value="updated">الأحدث</option><option value="name">الاسم</option><option value="created">تاريخ الإنشاء</option></select>
+      </div>
+      <div class="folders-grid" id="foldersArea"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="block-title"><h3>📎 ملفات القسم</h3><small id="rootFilesHint">يمكن نقلها لأي مجلد لاحقًا</small></div>
+      <div class="files-grid" id="rootFiles"></div>
+    </div>
+  </div>
+
+  <!-- داخل المجلد -->
+  <div class="folder-view" id="folderView">
+    <button class="back" onclick="closeFolder()">← العودة للقسم</button>
+    <div class="folder-view-head" id="folderViewHead">
+      <img id="folderHeadImage" class="hidden" alt="غلاف المجلد">
+      <div class="folder-head-copy"><div class="folder-view-title" id="folderViewTitle"></div><div class="folder-view-sub" id="folderViewSub"></div></div>
+    </div>
+
+    <div class="folder-tools teacher-only">
+      <button class="action" onclick="openFolderEditor(currentFolderId)">✏️ إدارة المجلد</button>
+      <label class="action upload upload-choice">📄 مستند / ملف<input id="folderUpload" type="file" onchange="addFolderFiles(event)"></label>
+      <label class="action upload upload-choice">🖼️ صور / فيديو<input id="folderMediaUpload" type="file" accept="image/*,video/*" multiple onchange="addFolderFiles(event)"></label>
+      <input id="fileSearch" placeholder="بحث في الملفات" oninput="renderFolderFiles()">
+      <select id="fileSort" onchange="renderFolderFiles()"><option value="updated">الأحدث</option><option value="name">الاسم</option><option value="type">النوع</option></select>
+      <button class="action secondary" onclick="toggleFileView()">▦ / ☷ العرض</button>
+      <button class="action secondary" type="button" onclick="shareCurrentFolder()">📤 إرسال المجلد</button>
+      <button class="action secondary" type="button" onclick="printCurrentFolder()">🖨️ طباعة المجلد</button>
+    </div>
+
+    <textarea class="editor editable-field" id="folderNote" placeholder="اكتبي ملاحظات أو محتوى هذا المجلد هنا..."></textarea>
+    <div class="actions teacher-only"><button class="action" onclick="saveFolderNote()">💾 حفظ محتوى المجلد</button></div>
+    <div class="files-grid" id="folderFiles"></div>
+  </div>
+</div></div>
+
+<!-- نافذة إنشاء/تعديل المجلد -->
+<div class="modal" id="folderModal"><div class="modal-card">
+  <h3 id="folderModalTitle">إنشاء مجلد جديد</h3>
+  <div class="form-grid">
+    <div class="field full"><label>اسم المجلد</label><input id="folderNameInput" maxlength="70" placeholder="مثال: التقارير الختامية"></div>
+    <div class="field"><label>الأيقونة — اكتبي أي إيموجي</label><input id="folderIconInput" maxlength="6" placeholder="📁"></div>
+    <div class="field"><label>لون المجلد — مفتوح بالكامل</label><div class="color-row"><input id="folderColorInput" type="color" value="#2f5d50"><input id="folderColorText" value="#2f5d50" oninput="syncColorFromText()"></div></div>
+    <div class="field full"><label>صورة غلاف للمجلد من الجوال (اختياري)</label><input id="folderCoverInput" type="file" accept="image/*" onchange="previewFolderCover(event)"><div class="preview-box" id="folderCoverPreview"><span>بدون صورة — ستظهر الأيقونة واللون</span></div></div>
+  </div>
+  <div class="modal-actions">
+    <button class="action secondary" onclick="closeModal('folderModal')">إلغاء</button>
+    <button class="action secondary hidden" id="moveFolderUpBtn" onclick="moveFolderOrder(-1)">↑ تقديم</button>
+    <button class="action secondary hidden" id="moveFolderDownBtn" onclick="moveFolderOrder(1)">↓ تأخير</button>
+    <button class="action" onclick="saveFolderFromModal()">حفظ المجلد</button>
+    <button class="action danger hidden" id="deleteFolderBtn" onclick="deleteFolderFromModal()">حذف المجلد</button>
+  </div>
+</div></div>
+
+<!-- نافذة نقل ملف -->
+<div class="modal" id="moveModal"><div class="modal-card">
+  <h3>نقل الملف</h3>
+  <div class="form-grid">
+    <div class="field full"><label>القسم الوجهة</label><select id="moveSectionSelect" onchange="refreshMoveFolders()"></select></div>
+    <div class="field full"><label>المجلد الوجهة</label><select id="moveFolderSelect"></select></div>
+  </div>
+  <div class="modal-actions"><button class="action secondary" onclick="closeModal('moveModal')">إلغاء</button><button class="action" onclick="confirmMoveFile()">نقل</button></div>
+</div></div>
+
+<!-- الاقتراحات والتوصيات -->
+<div class="modal" id="recommendModal"><div class="modal-card">
+  <h3>💬 الاقتراحات والتوصيات</h3>
+  <div class="form-grid">
+    <div class="field"><label>الفئة</label><select id="recCategory"><option>الإدارة</option><option>المشرفات</option><option>الأسر</option><option>الزائرات</option></select></div>
+    <div class="field"><label>الاسم</label><input id="recName" placeholder="الاسم"></div>
+    <div class="field"><label>النوع</label><select id="recType"><option>اقتراح</option><option>توصية</option><option>إشادة</option><option>توجيه</option></select></div>
+    <div class="field full"><label>النص</label><textarea id="recText" placeholder="اكتبي الملاحظة أو التوصية..."></textarea></div>
+  </div>
+  <div class="modal-actions"><button class="action secondary" onclick="closeModal('recommendModal')">إغلاق</button><button class="action" onclick="addRecommendation()">حفظ</button></div>
+  <div class="feed" id="recommendFeed" style="margin-top:14px"></div>
+</div></div>
+
+<!-- اعتماد الإدارة -->
+<div class="modal" id="approvalModal"><div class="modal-card">
+  <h3>✅ اعتماد الإدارة والمشرفة</h3><div class="viewer-note" id="approvalScopeNote" style="margin-bottom:10px">سيتم ربط الاعتماد بالقسم المفتوح عند الإرسال من داخل القسم.</div>
+  <div class="form-grid">
+    <div class="field"><label>الاسم</label><input id="approvalName" placeholder="اسم المديرة / الوكيلة / المشرفة"></div>
+    <div class="field"><label>الإجراء</label><select id="approvalStatus"><option>تمت المراجعة</option><option>تم الاعتماد</option><option>تم التوقيع</option><option>تم الختم والاعتماد</option></select></div>
+    <div class="field full"><label>الملاحظة</label><textarea id="approvalNote" placeholder="ملاحظة أو توجيه..."></textarea></div>
+    <div class="field"><label>صورة التوقيع (اختياري)</label><input id="approvalSignature" type="file" accept="image/*"></div>
+    <div class="field"><label>صورة الختم (اختياري)</label><input id="approvalStamp" type="file" accept="image/*"></div>
+  </div>
+  <div class="modal-actions"><button class="action secondary" onclick="closeModal('approvalModal')">إغلاق</button><button class="action" onclick="saveApproval()">حفظ الاعتماد</button></div>
+  <div class="feed" id="approvalFeed" style="margin-top:14px"></div>
+</div></div>
+
+<!-- الاستبيانات -->
+<div class="modal" id="surveyModal"><div class="modal-card">
+  <h3>📊 الاستبيانات والنتائج</h3>
+  <div class="viewer-note" id="surveyScopeNote" style="margin-bottom:10px">يمكن إنشاء استبيان عام أو ربطه بالقسم المفتوح.</div>
+  <div class="form-grid">
+    <div class="field full"><label>السؤال</label><input id="surveyQuestion" placeholder="مثال: كيف تقيمين وضوح التواصل؟"></div>
+    <div class="field"><label>نوع الإجابة</label><select id="surveyType"><option value="rating">تقييم</option><option value="yesno">نعم / لا</option><option value="choice">اختيار واحد</option><option value="short">إجابة قصيرة</option></select></div>
+    <div class="field"><label>الإجابة / النتيجة</label><input id="surveyAnswer" placeholder="مثال: ممتاز أو نعم أو نص قصير"></div>
+  </div>
+  <div class="modal-actions"><button class="action secondary" onclick="closeModal('surveyModal')">إغلاق</button><button class="action" onclick="saveSurveyResponse()">إضافة نتيجة</button></div>
+  <div class="feed" id="surveyFeed" style="margin-top:14px"></div>
+</div></div>
+
+<button id="publicRecommendFab" class="public-fab hidden" type="button" onclick="openRecommendations()">💬 أضف رأيك</button>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const items=[
+["👤","البيانات الشخصية","المعلومات والبيانات الشخصية"],["📄","السيرة الذاتية","المؤهلات والخبرات"],["🎯","الرؤية والرسالة","الرؤية والرسالة المهنية"],["⭐","الأهداف","الأهداف المهنية والتعليمية"],["🗓️","الخطة السنوية","الخطة والتنفيذ والمتابعة"],["📚","الوحدات التعليمية","الوحدات والتقارير الختامية"],["🧩","التحضير","تحضير الأنشطة التعليمية"],["💡","استراتيجيات التعليم","استراتيجيات وأساليب التعلم"],["🏆","إنجازات الأطفال","توثيق إنجازات الأطفال"],["📝","ملاحظات الأطفال","الملاحظات والمتابعة"],["🩺","التوجيه الصحي","تقارير وصور ومسابقات"],["📋","الاستبيانات","استبيانات الأسرة والمنسوبين"],["🪞","التقويم الذاتي","إعداد وتنفيذ التقويم الذاتي"],["👥","التقويم الخارجي","إعداد وتنفيذ التقويم الخارجي"],["📊","الأداء الوظيفي","توثيق ومتابعة الأداء"],["📁","ملفات وشواهد","رفع الملفات والشهادات"],["🎓","الدورات التدريبية","الدورات والتطوير المهني"],["📜","الشهادات","الشهادات وشواهد الإنجاز"],["🎬","الفيديوهات","مقاطع الفيديو والشواهد المرئية"],["🖼️","الصور","الصور والأنشطة"],["🤝","الشراكة المجتمعية","المبادرات والمشاركات"],["💬","ملاحظات الإدارة","ملاحظات المديرة والوكيلة والمشرفات"],["👨‍👩‍👧","ملاحظات الأسرة","ملاحظات الأسرة التعليمية والصحية"],["🌟","صورتي وشهاداتي","صور شخصية وشهادات وشواهد مهنية"]
+];
+const arNums=["١","٢","٣","٤","٥","٦","٧","٨","٩","١٠","١١","١٢","١٣","١٤","١٥","١٦","١٧","١٨","١٩","٢٠","٢١","٢٢","٢٣","٢٤"];
+const NS='tp_v4_';
+let currentSection='';
+let currentFolderId=null;
+let editingFolderId=null;
+let pendingFolderCover=null;
+let pendingMove=null;
+let fileViewMode='grid';
+let approvalImages={signature:null,stamp:null};
+
+const $=id=>document.getElementById(id);
+const now=()=>Date.now();
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const fmt=t=>t?new Date(t).toLocaleString('ar-SA',{dateStyle:'medium',timeStyle:'short'}):'—';
+const safeParse=(s,fallback)=>{if(s===null||s===undefined||s==='')return fallback;try{const v=JSON.parse(s);return v===null?fallback:v}catch{return fallback}};
+const getJSON=(k,f=[])=>safeParse(localStorage.getItem(NS+k),f);
+const setJSON=(k,v)=>localStorage.setItem(NS+k,JSON.stringify(v));
+
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2200)}
+function closeModal(id){$(id).classList.remove('open')}
+function openModal(id){$(id).classList.add('open')}
+
+function sectionAliases(){return getJSON('sectionAliases',{})}
+function sectionDisplayName(key){return sectionAliases()[key]||key}
+function renameCurrentSection(){const old=sectionDisplayName(currentSection),n=prompt('المسمى الجديد للقسم:',old);if(!n?.trim())return;const a=sectionAliases();a[currentSection]=n.trim();setJSON('sectionAliases',a);$('panelTitle').textContent=n.trim();renderCards();renderSideNav();toast('تم تعديل مسمى القسم دون فقد محتواه')}
+
+/* فهرس الشريط الجانبي */
+const expandedSideSections=new Set();
+
+function toggleSideNav(){
+  const nav=$('sideNav'),overlay=$('sideNavOverlay');
+  const willOpen=!nav.classList.contains('open');
+  nav.classList.toggle('open',willOpen);
+  overlay.classList.toggle('show',willOpen);
+  if(willOpen) renderSideNav();
+}
+function closeSideNav(){
+  $('sideNav')?.classList.remove('open');
+  $('sideNavOverlay')?.classList.remove('show');
+}
+function sideFoldersFor(section){
+  // يدعم بيانات النسخ الحديثة والقديمة حتى يظهر الفهرس كاملًا.
+  const modern=safeParse(localStorage.getItem(NS+'folders_'+section),null);
+  if(Array.isArray(modern)) return modern;
+  const old=safeParse(localStorage.getItem('folders_'+section),[]);
+  return Array.isArray(old)?old:[];
+}
+function renderSideNav(){
+  const list=$('sideNavList');if(!list)return;
+  const q=($('sideNavSearch')?.value||'').trim().toLowerCase();
+  list.innerHTML='';
+  items.forEach((it,i)=>{
+    const sectionKey=it[1];
+    const displayName=sectionDisplayName(sectionKey);
+    const folders=sideFoldersFor(sectionKey);
+    const matchedFolders=folders.filter(f=>(f.name||'').toLowerCase().includes(q));
+    const sectionMatches=!q || displayName.toLowerCase().includes(q) || (it[2]||'').toLowerCase().includes(q);
+    if(q && !sectionMatches && !matchedFolders.length) return;
+
+    const sec=document.createElement('div');
+    sec.className='side-sec'+(expandedSideSections.has(sectionKey)||q?' expanded':'');
+    const head=document.createElement('button');
+    head.type='button';head.className='side-sec-head';
+    head.innerHTML=`<span class="side-sec-icon">${esc(it[0])}</span>
+      <span class="side-sec-copy"><span class="side-sec-name">${arNums[i]}. ${esc(displayName)}</span>
+      <span class="side-sec-meta">${folders.length} مجلد</span></span>
+      <span class="side-sec-chevron">‹</span>`;
+    head.onclick=()=>{
+      if(expandedSideSections.has(sectionKey)) expandedSideSections.delete(sectionKey);
+      else expandedSideSections.add(sectionKey);
+      sec.classList.toggle('expanded');
+    };
+
+    // الضغط المطول/المزدوج على عنوان القسم يفتحه مباشرة.
+    head.ondblclick=()=>{closeSideNav();openPanel(sectionKey,it[2])};
+
+    const body=document.createElement('div');body.className='side-folders';
+    const visibleFolders=q&&!sectionMatches?matchedFolders:folders;
+    if(!visibleFolders.length){
+      body.innerHTML='<div class="side-no-folder">لا توجد مجلدات داخل هذا القسم</div>';
+    }else{
+      visibleFolders.forEach(f=>{
+        const b=document.createElement('button');b.type='button';b.className='side-folder';
+        b.innerHTML=`<span class="side-folder-icon">${esc(f.icon||'📁')}</span>
+          <span class="side-folder-name">${esc(f.name||'مجلد')}</span>
+          <span class="side-folder-count">${countFolderFiles(f.id,sectionKey)} ملف</span>`;
+        b.onclick=()=>{
+          closeSideNav();
+          openPanel(sectionKey,it[2]);
+          // openPanel يرسم المجلدات أولًا، ثم نفتح المجلد المختار.
+          setTimeout(()=>openFolder(String(f.id)),0);
+        };
+        body.appendChild(b);
+      });
+    }
+
+    // زر صغير لفتح القسم نفسه من مرة واحدة.
+    const openSection=document.createElement('button');
+    openSection.type='button';openSection.className='side-folder';
+    openSection.innerHTML='<span class="side-folder-icon">↗</span><span class="side-folder-name">فتح القسم</span>';
+    openSection.onclick=()=>{closeSideNav();openPanel(sectionKey,it[2])};
+    body.prepend(openSection);
+
+    sec.append(head,body);list.appendChild(sec);
+  });
+  if(!list.children.length) list.innerHTML='<div class="side-no-folder">لا توجد نتائج مطابقة.</div>';
+}
+
+function renderCards(){
+  const box=$('sections');box.innerHTML='';
+  items.forEach((it,i)=>{const label=sectionDisplayName(it[1]);const b=document.createElement('button');b.className='card';b.type='button';b.innerHTML=`<span class="icon">${it[0]}</span><span class="copy"><span class="title"><span class="num">${arNums[i]}.</span>${esc(label)}</span><span class="desc">${it[2]}</span></span>`;b.onclick=()=>openPanel(it[1],it[2]);box.appendChild(b)});
+  renderSideNav();
+}
+const SUPABASE_URL='https://hfsfuyzxduinaekllipc.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_E9uCMJvYUiY-YZZJCeV12w_oNhomoqk';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+  auth:{persistSession:true,detectSessionInUrl:true,autoRefreshToken:true}
+});
+
+async function signInWithMicrosoft(){
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+
+    // إذا كان المستخدم مسجلاً مسبقًا: لا نتجاوز الغلاف تلقائيًا،
+    // بل نفتح الملف فقط بعد ضغطه على زر الدخول.
+    if(session){
+      openPortfolio();
+      return;
+    }
+
+    // نتذكر أن المستخدم ضغط زر الدخول حتى نفتح الملف مرة واحدة
+    // بعد رجوعه من Microsoft.
+    sessionStorage.setItem('openAfterMicrosoft','1');
+
+    const {error}=await sb.auth.signInWithOAuth({
+      provider:'azure',
+      options:{
+        redirectTo:'https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index25.html',
+        scopes:'email'
+      }
+    });
+    if(error) throw error;
+  }catch(err){
+    sessionStorage.removeItem('openAfterMicrosoft');
+    console.error(err);
+    alert('تعذر تسجيل الدخول بحساب Microsoft. حاولي مرة أخرى.');
+  }
+}
+
+async function restoreMicrosoftSession(){
+  try{
+    const shouldOpen = sessionStorage.getItem('openAfterMicrosoft') === '1';
+    if(!shouldOpen) return false;
+
+    const {data:{session},error}=await sb.auth.getSession();
+    if(error) throw error;
+
+    if(session){
+      sessionStorage.removeItem('openAfterMicrosoft');
+      openPortfolio();
+      return true;
+    }
+    return false;
+  }catch(err){
+    console.error('Microsoft session restore error:',err);
+    return false;
+  }
+}
+
+// لا نفتح الصفحة الداخلية تلقائيًا عند كل زيارة.
+// نفتحها فقط مرة واحدة عند اكتمال تسجيل Microsoft بعد ضغط زر الدخول.
+sb.auth.onAuthStateChange((event,session)=>{
+  const shouldOpen = sessionStorage.getItem('openAfterMicrosoft') === '1';
+  if(shouldOpen && session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')){
+    sessionStorage.removeItem('openAfterMicrosoft');
+    setTimeout(()=>openPortfolio(),0);
+  }
+});
+
+function openPortfolio(){$('cover').style.display='none';$('portfolio').style.display='block';document.body.classList.remove('cover-open');window.scrollTo(0,0)}
+function goCover(){closePanel();$('portfolio').style.display='none';$('cover').style.display='grid';document.body.classList.add('cover-open');window.scrollTo(0,0)}
+function openPanel(title,desc){
+  currentSection=title;currentFolderId=null;
+  $('panelTitle').textContent=sectionDisplayName(title);$('panelDesc').textContent=desc;
+  migrateSection(title);
+  $('editor').value=localStorage.getItem(NS+'text_'+title)??localStorage.getItem('text_'+title)??'';
+  $('sectionMain').classList.remove('hidden');$('folderView').classList.remove('active');
+  renderFolders();renderRootFiles();renderSectionApproval();applyRole();
+  $('panel').classList.add('active');
+}
+function closePanel(){$('panel').classList.remove('active');currentFolderId=null}
+function saveText(){localStorage.setItem(NS+'text_'+currentSection,$('editor').value);toast('تم حفظ محتوى القسم')}
+
+function migrateSection(section){
+  const newFk=NS+'folders_'+section;
+  if(!localStorage.getItem(newFk)){
+    const old=safeParse(localStorage.getItem('folders_'+section),[]);
+    if(old.length){const upgraded=old.map((f,i)=>({id:String(f.id||now()+i),name:f.name||'مجلد',icon:f.icon||'📁',color:f.color||'#2f5d50',cover:f.cover||null,createdAt:f.createdAt||now(),updatedAt:f.updatedAt||now()}));localStorage.setItem(newFk,JSON.stringify(upgraded));}
+  }
+  const newRk=NS+'rootFiles_'+section;
+  if(!localStorage.getItem(newRk)){
+    const old=safeParse(localStorage.getItem('files_'+section),[]);
+    if(old.length){const upgraded=old.map((f,i)=>({...f,id:String(f.id||now()+i),createdAt:f.createdAt||now(),updatedAt:f.updatedAt||now()}));localStorage.setItem(newRk,JSON.stringify(upgraded));}
+  }
+}
+
+/* المجلدات */
+const folderKey=s=>'folders_'+s;
+function getFolders(section=currentSection){return getJSON(folderKey(section),[])}
+function saveFolders(a,section=currentSection){setJSON(folderKey(section),a)}
+function getFolder(id,section=currentSection){return getFolders(section).find(f=>String(f.id)===String(id))||null}
+function folderFilesKey(section,id){return 'folderFiles_'+section+'_'+id}
+function folderNoteKey(section,id){return 'folderNote_'+section+'_'+id}
+function countFolderFiles(id,section=currentSection){return getJSON(folderFilesKey(section,id),[]).length}
+
+function renderFolders(){
+  const area=$('foldersArea');if(!area)return;
+  let folders=[...getFolders()];
+  const q=($('folderSearch')?.value||'').trim().toLowerCase();if(q)folders=folders.filter(f=>(f.name||'').toLowerCase().includes(q));
+  const sort=$('folderSort')?.value||'custom';
+  if(sort!=='custom')folders.sort((a,b)=>sort==='name'?(a.name||'').localeCompare(b.name||'','ar'):sort==='created'?(b.createdAt||0)-(a.createdAt||0):(b.updatedAt||0)-(a.updatedAt||0));
+  $('folderCountText').textContent=`${folders.length} مجلد`;
+  area.innerHTML='';
+  if(!folders.length){area.innerHTML='<div class="empty-state" style="grid-column:1/-1">لا توجد مجلدات بعد. أنشئي مجلدًا ورتّبي الشواهد بداخله.</div>';return}
+  folders.forEach(folder=>{
+    const card=document.createElement('button');card.type='button';card.className='folder-card'+(folder.cover?'':' no-cover');card.style.background=folder.color||'#2f5d50';
+    const cover=folder.cover?`<img class="folder-cover" src="${folder.cover}" alt=""><span class="folder-shade"></span>`:'<span class="folder-shade"></span>';
+    const icon=folder.cover?'':`<div class="folder-icon">${esc(folder.icon||'📁')}</div>`;
+    card.innerHTML=`${cover}<span class="folder-menu teacher-only" role="button" aria-label="إدارة المجلد">⋯</span><div class="folder-body">${icon}<div class="folder-name">${esc(folder.name)}</div><div class="folder-meta"><span>📎 ${countFolderFiles(folder.id)} ملف</span><span>آخر تحديث ${fmt(folder.updatedAt||folder.createdAt)}</span></div></div>`;
+    card.onclick=e=>{if(e.target.closest('.folder-menu')){e.stopPropagation();openFolderEditor(folder.id)}else openFolder(folder.id)};
+    area.appendChild(card);
+  });
+  // لا نعيد applyRole هنا حتى لا ندخل في حلقة إعادة رسم لا نهائية.
+}
+
+function openFolderEditor(id=null){
+  editingFolderId=id;pendingFolderCover=null;
+  const f=id?getFolder(id):null;
+  $('folderModalTitle').textContent=f?'تعديل المجلد':'إنشاء مجلد جديد';
+  $('folderNameInput').value=f?.name||'';$('folderIconInput').value=f?.icon||'📁';
+  const c=f?.color||'#2f5d50';$('folderColorInput').value=validHex(c)?c:'#2f5d50';$('folderColorText').value=c;
+  $('folderCoverInput').value='';renderCoverPreview(f?.cover||null);
+  $('deleteFolderBtn').classList.toggle('hidden',!f);$('moveFolderUpBtn').classList.toggle('hidden',!f);$('moveFolderDownBtn').classList.toggle('hidden',!f);
+  openModal('folderModal');
+}
+function validHex(v){return /^#[0-9a-f]{6}$/i.test(v||'')}
+function syncColorFromText(){const v=$('folderColorText').value.trim();if(validHex(v))$('folderColorInput').value=v}
+const folderColorPicker=$('folderColorInput');if(folderColorPicker){folderColorPicker.addEventListener('input',()=>{const t=$('folderColorText');if(t)t.value=folderColorPicker.value})}
+function previewFolderCover(e){const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{pendingFolderCover=r.result;renderCoverPreview(pendingFolderCover)};r.readAsDataURL(f)}
+function renderCoverPreview(src){const p=$('folderCoverPreview');p.innerHTML=src?`<img src="${src}" alt="معاينة غلاف المجلد">`:'<span>بدون صورة — ستظهر الأيقونة واللون</span>'}
+function saveFolderFromModal(){
+  const name=$('folderNameInput').value.trim();if(!name){toast('اكتبي اسم المجلد');return}
+  const icon=$('folderIconInput').value.trim()||'📁';const color=validHex($('folderColorText').value.trim())?$('folderColorText').value.trim():$('folderColorInput').value;
+  const folders=getFolders();
+  if(editingFolderId){const i=folders.findIndex(f=>String(f.id)===String(editingFolderId));if(i<0)return;folders[i]={...folders[i],name,icon,color,cover:pendingFolderCover??folders[i].cover??null,updatedAt:now()};}
+  else{folders.unshift({id:String(now()),name,icon,color,cover:pendingFolderCover,createdAt:now(),updatedAt:now()});}
+  saveFolders(folders);closeModal('folderModal');renderFolders();renderSideNav();if(currentFolderId){currentFolderId=editingFolderId||currentFolderId;refreshFolderView()}toast('تم حفظ المجلد')
+}
+function moveFolderOrder(delta){if(!editingFolderId)return;const a=getFolders(),i=a.findIndex(f=>String(f.id)===String(editingFolderId)),j=i+delta;if(i<0||j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];saveFolders(a);$('folderSort').value='custom';renderFolders();renderSideNav();toast('تم تعديل ترتيب المجلد')}
+async function deleteFolderFromModal(){
+  if(!editingFolderId)return;const f=getFolder(editingFolderId);if(!confirm(`حذف المجلد «${f?.name||''}» ومحتوياته؟`))return;
+  const doomed=getFolderFiles(editingFolderId,currentSection);for(const x of doomed){if(x.storage==='idb')await idbDeleteFile(x.id)}
+  saveFolders(getFolders().filter(x=>String(x.id)!==String(editingFolderId)));renderSideNav();localStorage.removeItem(NS+folderFilesKey(currentSection,editingFolderId));localStorage.removeItem(NS+folderNoteKey(currentSection,editingFolderId));
+  closeModal('folderModal');if(String(currentFolderId)===String(editingFolderId))closeFolder();renderFolders();toast('تم حذف المجلد')
+}
+
+function openFolder(id){currentFolderId=id;$('sectionMain').classList.add('hidden');$('folderView').classList.add('active');refreshFolderView();window.scrollTo(0,0)}
+function closeFolder(){currentFolderId=null;$('folderView').classList.remove('active');$('sectionMain').classList.remove('hidden');renderFolders();renderRootFiles();window.scrollTo(0,0)}
+function refreshFolderView(){
+  const f=getFolder(currentFolderId);if(!f){closeFolder();return}
+  $('folderViewTitle').textContent=(f.icon?f.icon+' ':'')+f.name;
+  $('folderViewSub').textContent=`${countFolderFiles(f.id)} ملف • آخر تحديث ${fmt(f.updatedAt||f.createdAt)}`;
+  $('folderViewHead').style.background=f.color||'#2f5d50';
+  if(f.cover){$('folderHeadImage').src=f.cover;$('folderHeadImage').classList.remove('hidden')}else{$('folderHeadImage').classList.add('hidden')}
+  $('folderNote').value=localStorage.getItem(NS+folderNoteKey(currentSection,f.id))||'';
+  renderFolderFiles();applyRole();
+}
+function saveFolderNote(){if(!currentFolderId)return;localStorage.setItem(NS+folderNoteKey(currentSection,currentFolderId),$('folderNote').value);touchFolder(currentFolderId);toast('تم حفظ محتوى المجلد')}
+function touchFolder(id,section=currentSection){const a=getFolders(section),i=a.findIndex(f=>String(f.id)===String(id));if(i>=0){a[i].updatedAt=now();saveFolders(a,section)}}
+
+/* الملفات — تخزين كبير عبر IndexedDB */
+const FILE_DB_NAME='TeacherPortfolioLargeFilesV1';
+const FILE_DB_STORE='blobs';
+let fileDbPromise=null;
+function openFileDb(){
+  if(fileDbPromise)return fileDbPromise;
+  fileDbPromise=new Promise((resolve,reject)=>{
+    const req=indexedDB.open(FILE_DB_NAME,1);
+    req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(FILE_DB_STORE))db.createObjectStore(FILE_DB_STORE)};
+    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+  });
+  return fileDbPromise;
+}
+async function idbPutFile(id,blob){const db=await openFileDb();return new Promise((resolve,reject)=>{const tx=db.transaction(FILE_DB_STORE,'readwrite');tx.objectStore(FILE_DB_STORE).put(blob,id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
+async function idbGetFile(id){const db=await openFileDb();return new Promise((resolve,reject)=>{const tx=db.transaction(FILE_DB_STORE,'readonly'),r=tx.objectStore(FILE_DB_STORE).get(id);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}
+async function idbDeleteFile(id){try{const db=await openFileDb();return await new Promise((resolve,reject)=>{const tx=db.transaction(FILE_DB_STORE,'readwrite');tx.objectStore(FILE_DB_STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}catch(e){}}
+async function requestPersistentStorage(){try{if(navigator.storage?.persist)await navigator.storage.persist()}catch(e){}}
+requestPersistentStorage();
+
+function rootFilesKey(section=currentSection){return 'rootFiles_'+section}
+function getRootFiles(section=currentSection){return getJSON(rootFilesKey(section),[])}
+function saveRootFiles(a,section=currentSection){setJSON(rootFilesKey(section),a)}
+function getFolderFiles(id=currentFolderId,section=currentSection){return getJSON(folderFilesKey(section,id),[])}
+function saveFolderFiles(a,id=currentFolderId,section=currentSection){setJSON(folderFilesKey(section,id),a);touchFolder(id,section)}
+function extEmoji(f){const t=f.type||'',n=(f.name||'').toLowerCase();if(t.startsWith('image/'))return'🖼️';if(t.startsWith('video/'))return'🎬';if(n.endsWith('.pdf'))return'📕';if(/\.(doc|docx)$/.test(n))return'📘';if(/\.(xls|xlsx)$/.test(n))return'📗';if(/\.(ppt|pptx)$/.test(n))return'📙';if(/\.zip$/.test(n))return'🗜️';return'📎'}
+function fileSizeText(size){if(!size)return'';if(size<1024)return size+' B';if(size<1048576)return(size/1024).toFixed(1)+' KB';if(size<1073741824)return(size/1048576).toFixed(1)+' MB';return(size/1073741824).toFixed(2)+' GB'}
+function setUploadStatus(msg,show=true){const el=document.getElementById('uploadStatus');if(!el)return;el.textContent=msg;el.classList.toggle('show',show)}
+async function availableStorageText(){try{if(navigator.storage?.estimate){const e=await navigator.storage.estimate();const free=Math.max(0,(e.quota||0)-(e.usage||0));return fileSizeText(free)}}catch(e){}return ''}
+async function addFilesToStorage(input,ctx){
+  const incoming=[...(input.files||[])];
+  if(!incoming.length){setUploadStatus('لم يتم اختيار ملف. اختاري ملفًا من تطبيق «الملفات» ثم اضغطي «تأكيد».');return}
+  const total=incoming.reduce((n,f)=>n+(f.size||0),0);
+  const free=await availableStorageText();
+  const names=incoming.map(f=>`${f.name} (${fileSizeText(f.size||0)})`).join(' • ');
+  setUploadStatus(`✅ وصل الاختيار للموقع: ${names}${free?' • المساحة المتاحة تقريبًا '+free:''}`);
+  const metas=[];let done=0;
+  toast(`جاري حفظ ${incoming.length} ملف...`);
+  for(const f of incoming){
+    const id='f_'+now()+'_'+Math.random().toString(36).slice(2,9);
+    try{
+      /* تحويل File إلى Blob يحسن التوافق مع IndexedDB في Safari/iPhone */
+      const blob=f.slice(0,f.size,f.type||'application/octet-stream');
+      await idbPutFile(id,blob);
+      metas.push({id,name:f.name,type:f.type||'application/octet-stream',size:f.size||0,storage:'idb',createdAt:now(),updatedAt:now()});
+      done++;
+      setUploadStatus(`جاري الحفظ: ${done} من ${incoming.length} — ${f.name}`);
+    }catch(err){
+      console.error('UPLOAD_IDB_ERROR',err);
+      let msg=`تعذر حفظ «${f.name}» داخل تخزين Safari.`;
+      if(err&&err.name)msg+=` (${err.name})`;
+      setUploadStatus(msg+' سنستخدم Supabase Storage للملفات الكبيرة إذا استمرت المشكلة.',true);
+      toast(msg);
+    }
+  }
+  input.value='';
+  if(!metas.length)return;
+  if(ctx.kind==='root'){const a=getRootFiles(ctx.section||currentSection);a.unshift(...metas);saveRootFiles(a,ctx.section||currentSection);renderRootFiles()}
+  else{const a=getFolderFiles(ctx.folderId,ctx.section||currentSection);a.unshift(...metas);saveFolderFiles(a,ctx.folderId,ctx.section||currentSection);refreshFolderView()}
+  setUploadStatus(`✅ تم حفظ ${done} ملف${done===1?'':'ات'} بنجاح. سيظهر الآن داخل ${ctx.kind==='root'?'القسم':'المجلد'}.`);
+  toast(`تم حفظ ${done} ملف${done===1?'':'ات'} بنجاح`);
+}
+function addRootFiles(e){addFilesToStorage(e.target,{kind:'root',section:currentSection})}
+function addFolderFiles(e){if(!currentFolderId)return;addFilesToStorage(e.target,{kind:'folder',folderId:currentFolderId,section:currentSection})}
+
+function renderRootFiles(){const area=$('rootFiles');const a=getRootFiles();area.innerHTML='';if(!a.length){area.innerHTML='<div class="empty-state" style="grid-column:1/-1">لا توجد ملفات عامة في هذا القسم.</div>';return}a.forEach(f=>area.appendChild(buildFileCard(f,{kind:'root'})));applyRole()}
+function renderFolderFiles(){
+  if(!currentFolderId)return;const area=$('folderFiles');let a=[...getFolderFiles()];const q=($('fileSearch')?.value||'').trim().toLowerCase();if(q)a=a.filter(f=>(f.name||'').toLowerCase().includes(q));const sort=$('fileSort')?.value||'updated';a.sort((x,y)=>sort==='name'?(x.name||'').localeCompare(y.name||'','ar'):sort==='type'?(x.type||'').localeCompare(y.type||''):(y.updatedAt||y.createdAt||0)-(x.updatedAt||x.createdAt||0));area.classList.toggle('list-view',fileViewMode==='list');area.innerHTML='';if(!a.length){area.innerHTML='<div class="empty-state" style="grid-column:1/-1">المجلد فارغ. أضيفي صورًا أو فيديوهات أو مستندات.</div>';return}a.forEach(f=>area.appendChild(buildFileCard(f,{kind:'folder',folderId:currentFolderId})));applyRole()
+}
+function toggleFileView(){fileViewMode=fileViewMode==='grid'?'list':'grid';renderFolderFiles()}
+function buildFileCard(file,ctx){
+  const c=document.createElement('div');c.className='file-card';c.dataset.fileId=file.id;
+  let prev=`<div class="file-preview"><span class="file-emoji">${extEmoji(file)}</span></div>`;
+  if(file.data&&(file.type||'').startsWith('image/'))prev=`<div class="file-preview"><img src="${file.data}" alt="${esc(file.name)}"></div>`;
+  else if(file.data&&(file.type||'').startsWith('video/'))prev=`<div class="file-preview"><video src="${file.data}" controls preload="metadata"></video></div>`;
+  c.innerHTML=`${prev}<div class="file-name" title="${esc(file.name)}">${esc(file.name)}</div><div class="file-meta">${fileSizeText(file.size)} • ${fmt(file.updatedAt||file.createdAt)}</div><div class="file-actions"><button class="mini" data-a="open">فتح</button><span class="teacher-only"><button class="mini" data-a="share">📤 إرسال</button><button class="mini" data-a="print">🖨️ طباعة</button><button class="mini" data-a="rename">تسمية</button><button class="mini" data-a="up">↑</button><button class="mini" data-a="down">↓</button><button class="mini" data-a="move">نقل</button><button class="mini danger" data-a="delete">حذف</button></span></div>`;
+  c.querySelector('[data-a=open]')?.addEventListener('click',()=>openFile(file));
+  c.querySelector('[data-a=share]')?.addEventListener('click',()=>shareFile(file));
+  c.querySelector('[data-a=print]')?.addEventListener('click',()=>printFile(file));
+  c.querySelector('[data-a=rename]')?.addEventListener('click',()=>renameFile(file.id,ctx));
+  c.querySelector('[data-a=up]')?.addEventListener('click',()=>moveFileOrder(file.id,ctx,-1));
+  c.querySelector('[data-a=down]')?.addEventListener('click',()=>moveFileOrder(file.id,ctx,1));
+  c.querySelector('[data-a=move]')?.addEventListener('click',()=>openMoveFile(file.id,ctx));
+  c.querySelector('[data-a=delete]')?.addEventListener('click',()=>deleteFile(file.id,ctx));
+  c.querySelector('.file-preview')?.addEventListener('click',()=>openFile(file));
+  if(file.storage==='idb'&&((file.type||'').startsWith('image/')||(file.type||'').startsWith('video/')))hydratePreview(c,file);
+  return c;
+}
+async function hydratePreview(card,file){
+  try{const blob=await idbGetFile(file.id);if(!blob||!card.isConnected)return;const url=URL.createObjectURL(blob);const p=card.querySelector('.file-preview');
+    if((file.type||'').startsWith('image/'))p.innerHTML=`<img src="${url}" alt="${esc(file.name)}">`;
+    else if((file.type||'').startsWith('video/'))p.innerHTML=`<video src="${url}" controls preload="metadata"></video>`;
+  }catch(e){console.error(e)}
+}
+async function openFile(file){
+  if(file.data){const w=window.open();if(w){if((file.type||'').startsWith('image/'))w.document.write(`<img src="${file.data}" style="max-width:100%;height:auto">`);else if((file.type||'').startsWith('video/'))w.document.write(`<video src="${file.data}" controls autoplay style="max-width:100%"></video>`);else w.location=file.data}return}
+  const blob=await idbGetFile(file.id);if(!blob){toast('تعذر العثور على الملف على هذا الجهاز');return}const url=URL.createObjectURL(blob);const w=window.open(url,'_blank');if(!w){const a=document.createElement('a');a.href=url;a.download=file.name;a.click()}setTimeout(()=>URL.revokeObjectURL(url),60000)
+}
+
+function cleanText(v){return String(v??'').replace(/\s+/g,' ').trim()}
+function sectionDisplayTitle(section=currentSection){return getSectionTitle?getSectionTitle(section):section}
+async function sharePayload(payload){
+  try{
+    if(navigator.share){await navigator.share(payload);return true}
+  }catch(err){if(err?.name==='AbortError')return false;console.warn(err)}
+  try{
+    const text=[payload.title,payload.text,payload.url].filter(Boolean).join('\n');
+    if(navigator.clipboard&&text){await navigator.clipboard.writeText(text);toast('تعذرت نافذة الإرسال؛ تم نسخ المحتوى للحافظة');return true}
+  }catch(e){}
+  toast('المشاركة غير مدعومة في هذا المتصفح');return false
+}
+async function fileToShareable(file){
+  try{
+    let blob=null;
+    if(file.storage==='idb')blob=await idbGetFile(file.id);
+    else if(file.data){const r=await fetch(file.data);blob=await r.blob()}
+    if(!blob)return null;
+    return new File([blob],file.name||'ملف',{type:file.type||blob.type||'application/octet-stream'})
+  }catch(e){console.error(e);return null}
+}
+async function shareFile(file){
+  const f=await fileToShareable(file);
+  const title=file.name||'ملف من ملف الإنجاز';
+  if(f&&navigator.canShare?.({files:[f]})){
+    try{await navigator.share({title,text:'مشاركة من ملف الإنجاز المهني',files:[f]});return}catch(err){if(err?.name==='AbortError')return;console.warn(err)}
+  }
+  await sharePayload({title,text:'مشاركة ملف: '+title});
+  if(f&&!navigator.canShare?.({files:[f]}))toast('جهازك لا يسمح بإرسال هذا الملف مباشرة من المتصفح؛ استخدمي فتح ثم مشاركة من Safari')
+}
+async function printFile(file){
+  try{
+    let url=file.data||null,revoke=false;
+    if(!url&&file.storage==='idb'){
+      const blob=await idbGetFile(file.id);if(!blob){toast('تعذر العثور على الملف على هذا الجهاز');return}
+      url=URL.createObjectURL(blob);revoke=true;
+    }
+    if(!url){toast('تعذر تجهيز الملف للطباعة');return}
+    const type=file.type||'';const n=(file.name||'').toLowerCase();
+    if(type.startsWith('image/')){
+      const w=window.open('','_blank');if(!w){toast('اسمحي بالنوافذ المنبثقة للطباعة');return}
+      w.document.write(`<html dir="rtl"><head><title>${esc(file.name)}</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;display:grid;place-items:center;min-height:100vh}img{max-width:100%;max-height:100vh}</style></head><body><img src="${url}" onload="setTimeout(()=>window.print(),250)">
+<!-- نوافذ المشاركة بالباركود - v23 -->
+<div class="modal" id="shareBuilderModal">
+  <div class="modal-card">
+    <h3>🔗 إنشاء رابط وباركود خاص</h3>
+    <div class="form-grid">
+      <div class="field">
+        <label>نوع الدخول</label>
+        <select id="shareAccessRole">
+          <option value="admin">الإدارة / المشرفة — مراجعة واعتماد</option>
+          <option value="family">الأسرة / الزائرة — مشاهدة وتوصية</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>مدة الرابط</label>
+        <select id="shareDays">
+          <option value="1">يوم واحد</option>
+          <option value="3">3 أيام</option>
+          <option value="7" selected>7 أيام</option>
+          <option value="14">14 يومًا</option>
+          <option value="30">30 يومًا</option>
+        </select>
+      </div>
+      <div class="field full">
+        <label>القسم</label>
+        <input id="shareSectionName" readonly>
+      </div>
+    </div>
+
+    <div class="qr-box" id="shareQrBox">
+      <span style="color:#756a5d">اضغطي «إنشاء الرابط» لظهور الباركود</span>
+    </div>
+    <div class="qr-link hidden" id="shareLinkText"></div>
+
+    <div class="modal-actions">
+      <button class="action" type="button" onclick="createSecureShare()">إنشاء الرابط والباركود</button>
+      <button class="action secondary hidden" id="copyShareBtn" type="button" onclick="copySecureShare()">نسخ الرابط</button>
+      <button class="action secondary hidden" id="sendShareBtn" type="button" onclick="sendSecureShare()">إرسال</button>
+      <button class="action secondary" type="button" onclick="closeModal('shareBuilderModal')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="shareCenterModal">
+  <div class="modal-card" style="max-width:760px">
+    <h3>🔗 المشاركة بالباركود</h3>
+    <div class="modal-actions" style="margin-bottom:12px">
+      <button class="action" type="button"
+        onclick="closeModal('shareCenterModal');setTimeout(openShareBuilder,80)">
+        إنشاء باركود للقسم الحالي
+      </button>
+    </div>
+    <div id="shareCenterFeed">
+      <div class="empty-state">جاري التحميل...</div>
+    </div>
+    <div class="modal-actions">
+      <a class="action secondary" href="#" style="text-decoration:none">إغلاق</a>
+    </div>
+  </div>
+</div>
+
+<section id="shareGuest" class="share-guest" aria-live="polite">
+  <div class="share-shell">
+    <div class="share-role-badge" id="guestRoleBadge"></div>
+    <h1 id="guestShareTitle">ملف للمراجعة</h1>
+    <div class="share-meta" id="guestShareMeta"></div>
+
+    <h2>المحتوى</h2>
+    <div class="share-text" id="guestShareText"></div>
+
+    <h2>الملفات المرفقة</h2>
+    <div class="share-files" id="guestShareFiles"></div>
+
+    <div id="guestAdminForm" class="hidden">
+      <h2>✅ اعتماد الإدارة</h2>
+      <div class="share-form">
+        <input id="guestAdminName" placeholder="اسم المديرة / المشرفة">
+        <select id="guestAdminStatus">
+          <option value="approved">معتمد</option>
+          <option value="needs_changes">يحتاج تعديل</option>
+        </select>
+        <textarea id="guestAdminNote" placeholder="الملاحظة"></textarea>
+        <label><b>التوقيع:</b></label>
+        <canvas id="signatureCanvas" class="signature-canvas" width="700" height="220"></canvas>
+        <button class="action secondary" type="button" onclick="clearGuestSignature()">مسح التوقيع</button>
+        <label><b>الختم (اختياري):</b></label>
+        <input id="guestStampFile" type="file" accept="image/*">
+        <button class="action" type="button" onclick="submitGuestApproval()">حفظ الاعتماد</button>
+      </div>
+    </div>
+
+    <div id="guestFamilyForm" class="hidden">
+      <h2>💬 مشاركة الأسرة / الزائرة</h2>
+      <div class="share-form">
+        <input id="guestFamilyName" placeholder="الاسم">
+        <textarea id="guestFamilyNote" placeholder="الرأي أو التوصية"></textarea>
+        <button class="action" type="button" onclick="submitGuestRecommendation()">إرسال التوصية</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body></html>`);w.document.close();
+    }else if(type==='application/pdf'||n.endsWith('.pdf')){
+      const w=window.open(url,'_blank');if(!w){toast('اسمحي بالنوافذ المنبثقة للطباعة');return}
+      toast('بعد فتح PDF اختاري مشاركة ثم طباعة إذا لم تظهر نافذة الطباعة تلقائيًا');
+    }else{
+      const w=window.open(url,'_blank');if(!w){toast('اسمحي بالنوافذ المنبثقة');return}
+      toast('هذا النوع يفتح في عارض الجهاز؛ اختاري مشاركة ثم طباعة من العارض')
+    }
+    if(revoke)setTimeout(()=>URL.revokeObjectURL(url),120000)
+  }catch(e){console.error(e);toast('تعذر تجهيز الملف للطباعة')}
+}
+function approvalSummaryFor(section=currentSection){
+  try{
+    const a=getJSON('approvals',[]).filter(x=>x.section===section);if(!a.length)return'';
+    const x=a[0];return [x.status,x.name,x.note].filter(Boolean).join(' — ')
+  }catch(e){return''}
+}
+function openPrintDocument(title,html){
+  const w=window.open('','_blank');if(!w){toast('اسمحي بالنوافذ المنبثقة للطباعة');return}
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>body{margin:0;background:#fff}.print-sheet{font-family:"Geeza Pro","Noto Naskh Arabic",Tahoma,Arial,sans-serif;direction:rtl;color:#173d34;padding:28px;max-width:900px;margin:auto}.print-sheet h1,.print-sheet h2{color:#075b45}.meta{color:#756a5d;font-size:13px}.box{border:1px solid #d9c392;border-radius:14px;padding:14px;margin:12px 0}.brand{border-bottom:2px solid #c7a34b;padding-bottom:10px;margin-bottom:18px}.file-row{padding:7px 0;border-bottom:1px solid #eee}@media print{button{display:none}.print-sheet{padding:12mm}}</style></head><body><div class="print-sheet">${html}</div><script>setTimeout(()=>window.print(),350)<\/script></body></html>`);w.document.close()
+}
+function printCurrentSection(){
+  if(!currentSection)return;const title=sectionDisplayTitle();const note=cleanText($('editor')?.value||localStorage.getItem(NS+'text_'+currentSection)||'');
+  const folders=getFolders();const files=getRootFiles();const approval=approvalSummaryFor();
+  const folderHtml=folders.length?`<div class="box"><h2>المجلدات</h2><ul>${folders.map(f=>`<li>${esc((f.icon||'📁')+' '+f.name)} — ${countFolderFiles(f.id)} ملف</li>`).join('')}</ul></div>`:'';
+  const filesHtml=files.length?`<div class="box"><h2>ملفات القسم</h2>${files.map(f=>`<div class="file-row">${esc(f.name)} ${fileSizeText(f.size)?'— '+fileSizeText(f.size):''}</div>`).join('')}</div>`:'';
+  openPrintDocument(title,`<div class="brand"><h1>${esc(title)}</h1><div class="meta">ملف الإنجاز المهني • ${new Date().toLocaleDateString('ar-SA')}</div></div>${note?`<div class="box"><h2>محتوى القسم</h2><div>${esc(note).replace(/\n/g,'<br>')}</div></div>`:''}${approval?`<div class="box"><h2>الاعتماد والملاحظات</h2><div>${esc(approval)}</div></div>`:''}${folderHtml}${filesHtml}`)
+}
+async function shareCurrentSection(){
+  if(!currentSection)return;const title=sectionDisplayTitle();const note=cleanText($('editor')?.value||'');const folders=getFolders();const files=getRootFiles();
+  const text=[`القسم: ${title}`,note?`المحتوى: ${note}`:'',folders.length?`المجلدات: ${folders.map(f=>f.name).join('، ')}`:'',files.length?`الملفات: ${files.map(f=>f.name).join('، ')}`:''].filter(Boolean).join('\n');
+  await sharePayload({title:'ملف الإنجاز — '+title,text})
+}
+function printCurrentFolder(){
+  const f=getFolder(currentFolderId);if(!f)return;const note=cleanText($('folderNote')?.value||'');const files=getFolderFiles();
+  openPrintDocument(f.name,`<div class="brand"><h1>${esc((f.icon||'📁')+' '+f.name)}</h1><div class="meta">${files.length} ملف • ${new Date().toLocaleDateString('ar-SA')}</div></div>${note?`<div class="box"><h2>محتوى المجلد</h2><div>${esc(note).replace(/\n/g,'<br>')}</div></div>`:''}${files.length?`<div class="box"><h2>الملفات</h2>${files.map(x=>`<div class="file-row">${esc(x.name)} ${fileSizeText(x.size)?'— '+fileSizeText(x.size):''}</div>`).join('')}</div>`:'<div class="box">المجلد لا يحتوي ملفات.</div>'}`)
+}
+async function shareCurrentFolder(){
+  const f=getFolder(currentFolderId);if(!f)return;const note=cleanText($('folderNote')?.value||'');const files=getFolderFiles();
+  const text=[`المجلد: ${f.name}`,`القسم: ${sectionDisplayTitle()}`,note?`المحتوى: ${note}`:'',files.length?`الملفات: ${files.map(x=>x.name).join('، ')}`:''].filter(Boolean).join('\n');
+  await sharePayload({title:'مجلد — '+f.name,text})
+}
+
+function getCtxFiles(ctx,section=currentSection){return ctx.kind==='root'?getRootFiles(section):getFolderFiles(ctx.folderId,section)}
+function setCtxFiles(a,ctx,section=currentSection){ctx.kind==='root'?saveRootFiles(a,section):saveFolderFiles(a,ctx.folderId,section)}
+function renameFile(id,ctx){const a=getCtxFiles(ctx),i=a.findIndex(f=>String(f.id)===String(id));if(i<0)return;const n=prompt('الاسم الجديد للملف:',a[i].name);if(!n?.trim())return;a[i].name=n.trim();a[i].updatedAt=now();setCtxFiles(a,ctx);ctx.kind==='root'?renderRootFiles():renderFolderFiles();toast('تم تعديل الاسم')}
+function moveFileOrder(id,ctx,delta){const a=getCtxFiles(ctx),i=a.findIndex(f=>String(f.id)===String(id)),j=i+delta;if(i<0||j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];setCtxFiles(a,ctx);if(ctx.kind==='root')renderRootFiles();else{$('fileSort').value='updated';renderFolderFiles()}toast('تم تعديل ترتيب الملف')}
+async function deleteFile(id,ctx){if(!confirm('حذف هذا الملف؟'))return;const a=getCtxFiles(ctx),f=a.find(x=>String(x.id)===String(id));setCtxFiles(a.filter(x=>String(x.id)!==String(id)),ctx);if(f?.storage==='idb')await idbDeleteFile(f.id);ctx.kind==='root'?renderRootFiles():renderFolderFiles();toast('تم حذف الملف')}
+
+function openMoveFile(id,ctx){pendingMove={id,ctx};$('moveSectionSelect').innerHTML=items.map(i=>`<option value="${esc(i[1])}" ${i[1]===currentSection?'selected':''}>${esc(i[1])}</option>`).join('');refreshMoveFolders();openModal('moveModal')}
+function refreshMoveFolders(){const section=$('moveSectionSelect').value;migrateSection(section);const folders=getFolders(section);$('moveFolderSelect').innerHTML='<option value="__root__">ملفات القسم العامة</option>'+folders.map(f=>`<option value="${esc(f.id)}">${esc(f.name)}</option>`).join('')}
+function confirmMoveFile(){
+  if(!pendingMove)return;const srcSection=currentSection,srcCtx=pendingMove.ctx;const src=getCtxFiles(srcCtx,srcSection),i=src.findIndex(f=>String(f.id)===String(pendingMove.id));if(i<0)return;const [file]=src.splice(i,1);const dstSection=$('moveSectionSelect').value,dstFolder=$('moveFolderSelect').value;
+  try{setCtxFiles(src,srcCtx,srcSection);if(dstFolder==='__root__'){const dst=getRootFiles(dstSection);dst.unshift({...file,updatedAt:now()});saveRootFiles(dst,dstSection)}else{const dst=getFolderFiles(dstFolder,dstSection);dst.unshift({...file,updatedAt:now()});saveFolderFiles(dst,dstFolder,dstSection)}closeModal('moveModal');pendingMove=null;currentFolderId?renderFolderFiles():renderRootFiles();renderFolders();toast('تم نقل الملف')}catch(err){toast('تعذر النقل')}
+}
+
+async function clearSection(){if(!confirm('حذف نص وملفات القسم العامة؟ المجلدات لن تُحذف.'))return;const files=getRootFiles();for(const f of files){if(f.storage==='idb')await idbDeleteFile(f.id)}localStorage.removeItem(NS+'text_'+currentSection);localStorage.removeItem(NS+rootFilesKey(currentSection));$('editor').value='';renderRootFiles();toast('تم تنظيف محتوى القسم العام')}
+
+/* الاعتمادات */
+function approvals(){return getJSON('approvals',[])}
+async function fileToDataUrl(file){return await new Promise(resolve=>{if(!file)return resolve(null);const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>resolve(null);r.readAsDataURL(file)})}
+async function saveApproval(){const name=$('approvalName').value.trim();if(!name){toast('اكتبي الاسم');return}const signature=await fileToDataUrl($('approvalSignature').files?.[0]),stamp=await fileToDataUrl($('approvalStamp').files?.[0]);const a=approvals();a.unshift({id:String(now()),section:currentSection||'عام',name,status:$('approvalStatus').value,note:$('approvalNote').value.trim(),signature,stamp,date:now()});setJSON('approvals',a);$('approvalNote').value='';$('approvalSignature').value='';$('approvalStamp').value='';renderApprovalFeed();renderSectionApproval();toast('تم حفظ الاعتماد')}
+function renderSectionApproval(){const e=$('sectionApprovalBadge');if(!e)return;const a=approvals().find(x=>x.section===currentSection);e.innerHTML=a?`<span class="approval-badge">✅ ${esc(a.status)} • ${esc(a.name)}</span>`:''}
+function openSectionApprovalForm(){if($('approvalScopeNote'))$('approvalScopeNote').textContent='سيتم حفظ الاعتماد على القسم: '+(currentSection||'عام');openApprovals()}
+function openApprovals(){if($('approvalScopeNote')&&!currentSection)$('approvalScopeNote').textContent='اعتماد عام للملف أو مراجعة الاعتمادات السابقة.';renderApprovalFeed();openModal('approvalModal')}
+function renderApprovalFeed(){const e=$('approvalFeed');const a=approvals();e.innerHTML=a.length?a.slice(0,20).map(x=>`<div class="feed-item"><span class="tag">${esc(x.section)}</span><strong>${esc(x.status)}</strong> — ${esc(x.name)}<br><small>${fmt(x.date)}</small>${x.note?`<p>${esc(x.note)}</p>`:''}${x.signature?`<img src="${x.signature}" alt="التوقيع" style="max-width:110px;max-height:55px;object-fit:contain;margin:4px">`:''}${x.stamp?`<img src="${x.stamp}" alt="الختم" style="max-width:110px;max-height:55px;object-fit:contain;margin:4px">`:''}</div>`).join(''):'<div class="empty-state">لا توجد اعتمادات بعد.</div>'}
+
+/* الاقتراحات والتوصيات */
+function recommendations(){return getJSON('recommendations',[])}
+function openRecommendations(){renderRecommendations();openModal('recommendModal')}
+function addRecommendation(){const name=$('recName').value.trim(),text=$('recText').value.trim();if(!name||!text){toast('أكملي الاسم والنص');return}const a=recommendations();a.unshift({id:String(now()),category:$('recCategory').value,type:$('recType').value,name,text,date:now()});setJSON('recommendations',a);$('recText').value='';renderRecommendations();toast('تم حفظ المشاركة')}
+function renderRecommendations(){const e=$('recommendFeed'),a=recommendations();e.innerHTML=a.length?a.map(x=>`<div class="feed-item"><span class="tag">${esc(x.category)}</span><span class="tag">${esc(x.type)}</span><strong>${esc(x.name)}</strong><p>${esc(x.text)}</p><small>${fmt(x.date)}</small></div>`).join(''):'<div class="empty-state">لا توجد اقتراحات أو توصيات بعد.</div>'}
+
+/* استبيانات مبسطة */
+function surveyData(){return getJSON('surveyResponses',[])}
+function openSurveys(){window._surveyScope='عام';$('surveyScopeNote').textContent='استبيان عام للملف. النتائج في هذه النسخة محفوظة محليًا على هذا الجهاز.';renderSurvey();openModal('surveyModal')}
+function openSectionSurvey(){window._surveyScope=currentSection||'عام';$('surveyScopeNote').textContent='الاستبيان مرتبط بالقسم: '+(currentSection||'عام')+' — بعد ربط Supabase يمكن مشاركة الرابط واستقبال الردود من أجهزة أخرى.';renderSurvey();openModal('surveyModal')}
+function saveSurveyResponse(){const q=$('surveyQuestion').value.trim(),ans=$('surveyAnswer').value.trim();if(!q){toast('اكتبي السؤال');return}if(!ans){toast('اكتبي الإجابة أو النتيجة');return}const a=surveyData();a.unshift({section:window._surveyScope||'عام',q,type:$('surveyType')?.value||'rating',answer:ans,date:now()});setJSON('surveyResponses',a);$('surveyAnswer').value='';renderSurvey();toast('تمت إضافة النتيجة')}
+function renderSurvey(){const e=$('surveyFeed'),scope=window._surveyScope||null,a=surveyData().filter(x=>!scope||scope==='عام'||x.section===scope);if(!a.length){e.innerHTML='<div class="empty-state">لا توجد نتائج بعد.</div>';return}const counts={};a.forEach(x=>{const k=(x.section||'عام')+'|||'+x.q+'|||'+x.answer;counts[k]=(counts[k]||0)+1});e.innerHTML=Object.entries(counts).map(([k,n])=>{const [section,q,ans]=k.split('|||');return`<div class="feed-item"><span class="tag">${esc(section)}</span><strong>${esc(q)}</strong><br><span class="tag">${esc(ans)}</span> <b>${n}</b> استجابة</div>`}).join('')}
+
+function cloudInfo(){alert('بما أن لديك حساب Microsoft، فهذا يساعدنا في مرحلة الدخول الحقيقي. الربط النهائي سيكون عبر Supabase للحفظ السحابي والصلاحيات، ثم إعداد تسجيل الدخول بواسطة Microsoft / Microsoft Entra إذا كان حسابك المؤسسي يسمح بذلك. هذه النسخة الحالية لا تسجل الدخول إلى Microsoft تلقائيًا بعد؛ تحتاج مرحلة إعداد آمنة تشمل مشروع Supabase وإعداد تطبيق Microsoft وربط عنوان الموقع. بعدها يمكن للمعلمة والإدارة والأسرة الدخول بحسابات منفصلة وتظهر الملفات والاعتمادات والاستبيانات بين الأجهزة.')}
+
+const isManageMode = new URLSearchParams(window.location.search).get('public') !== '1';
+
+function setRole(role){
+  if($('roleSelect')) $('roleSelect').value=role;
+  applyRole();
+}
+function updateRoleCards(role){
+  const map={teacher:'roleTeacherCard',admin:'roleAdminCard',family:'roleFamilyCard'};
+  Object.entries(map).forEach(([r,id])=>$(id)?.classList.toggle('active',r===role));
+}
+
+function applyRole(){
+  const role = isManageMode ? ($('roleSelect')?.value || 'teacher') : 'family';
+
+  document.body.classList.toggle('public-view', !isManageMode);
+
+  document.querySelectorAll('.teacher-only').forEach(el=>{
+    el.classList.toggle('hidden', role !== 'teacher');
+  });
+
+  document.querySelectorAll('.admin-only').forEach(el=>{
+    el.classList.toggle('hidden', !(role === 'teacher' || role === 'admin'));
+  });
+
+  document.querySelectorAll('.manage-only').forEach(el=>{
+    el.classList.toggle('hidden', !isManageMode);
+  });
+
+  document.querySelectorAll('.editable-field').forEach(el=>{
+    el.readOnly = role !== 'teacher';
+    el.setAttribute('aria-readonly', role !== 'teacher' ? 'true' : 'false');
+  });
+
+  const hints={
+    teacher:'👩‍🏫 المعلمة — صلاحية كاملة: إضافة وتعديل وحذف ورفع وإدارة المجلدات.',
+    admin:'🏫 الإدارة / المشرفة — مشاهدة ومراجعة واعتماد وملاحظات، بدون تعديل محتوى المعلمة.',
+    family:'👨‍👩‍👧 الأسرة / الزائرة — مشاهدة فقط، مع إمكانية إضافة رأي أو توصية.'
+  };
+  if($('roleHint')) $('roleHint').textContent = hints[role] || hints.family;
+  updateRoleCards(role);
+  if($('roleSection')) $('roleSection').classList.toggle('hidden', false);
+
+  if($('publicBanner')) $('publicBanner').classList.toggle('hidden', isManageMode);
+  if($('publicRecommendFab')) $('publicRecommendFab').classList.toggle('hidden', isManageMode);
+
+  // في وضع المشاهدة العامة نظهر الأقسام السفلية كلها.
+  // التوصيات تبقى تفاعلية، والبقية تظهر للعرض فقط بدون صلاحيات إدارة.
+  document.querySelectorAll('.specials .special-card').forEach((el)=>{
+    if(!isManageMode) el.classList.remove('hidden');
+  });
+
+  // أدوات التحرير الديناميكية تحمل class=teacher-only / admin-only،
+  // لذلك يكفي تحديث إظهارها وإخفائها بدون إعادة رسم المجلدات أو الملفات.
+  document.querySelectorAll('.teacher-only').forEach(el=>{
+    el.classList.toggle('hidden', role !== 'teacher');
+  });
+  document.querySelectorAll('.admin-only').forEach(el=>{
+    el.classList.toggle('hidden', !(role === 'teacher' || role === 'admin'));
+  });
+  document.querySelectorAll('.manage-only').forEach(el=>{
+    el.classList.toggle('hidden', !isManageMode);
+  });
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  restoreMicrosoftSession();
+  try{
+    renderCards();
+    if($('roleSelect')) $('roleSelect').value=isManageMode?'teacher':'family';
+    applyRole();
+  }catch(err){
+    console.error(err);
+    const box=$('sections');
+    if(box&&!box.children.length){
+      box.innerHTML='<div class="empty-state" style="grid-column:1/-1">تعذر تحميل الأقسام. حدّثي الصفحة مرة واحدة.</div>';
+    }
+  }
+});
+
+/* ===== v24: مشاركة آمنة بالإدارة والأسرة ===== */
+
+function openShareBuilderSafe(){
+  try{
+    if(!currentSection){
+      alert('افتحي القسم المطلوب أولًا، ثم اضغطي زر الباركود داخل القسم.');
+      return;
+    }
+    const m=document.getElementById('shareBuilderModal');
+    if(m) m.classList.add('open');
+    if(document.getElementById('shareSectionName')) document.getElementById('shareSectionName').value=sectionDisplayName(currentSection);
+    const qr=document.getElementById('shareQrBox');
+    if(qr) qr.innerHTML='<span style="color:#756a5d">اضغطي «إنشاء الرابط والباركود»</span>';
+  }catch(e){
+    console.error(e);
+    alert('تعذر فتح نافذة المشاركة.');
+  }
+}
+
+let currentSecureShareLink = '';
+let currentGuestShare = null;
+
+function openShareBuilder(){
+  if(!currentSection){ toast('افتحي القسم المطلوب أولًا'); return; }
+  $('shareSectionName').value = sectionDisplayName(currentSection);
+  $('shareQrBox').innerHTML='<span style="color:#756a5d">اضغطي «إنشاء الرابط» لظهور الباركود</span>';
+  $('shareLinkText').classList.add('hidden');
+  $('copyShareBtn').classList.add('hidden');
+  $('sendShareBtn').classList.add('hidden');
+  currentSecureShareLink='';
+  openModal('shareBuilderModal');
+}
+
+async function blobForPortfolioFile(file){
+  try{
+    if(file.storage==='idb') return await idbGetFile(file.id);
+    if(file.data){
+      const r=await fetch(file.data);
+      return await r.blob();
+    }
+  }catch(e){ console.error(e); }
+  return null;
+}
+
+function safeSharedName(name){
+  return String(name||'file').replace(/[^\w\u0600-\u06FF.\-]+/g,'_').slice(-120);
+}
+
+async function createSecureShare(){
+  try{
+    if(!currentSection){ toast('افتحي القسم المطلوب'); return; }
+    const role=$('shareAccessRole').value;
+    const days=Number($('shareDays').value||7);
+    const title=sectionDisplayName(currentSection);
+    const textValue=localStorage.getItem(NS+'text_'+currentSection) || '';
+    const snapshot={section:currentSection,title,text:textValue};
+
+    toast('جاري تجهيز الرابط...');
+    const {data,error}=await sb.rpc('create_share_link',{
+      p_role:role,p_section:currentSection,p_title:title,p_snapshot:snapshot,p_days:days
+    });
+    if(error) throw error;
+    const shareId=data.id, token=data.token;
+
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session) throw new Error('يجب تسجيل دخول المعلمة');
+
+    const gathered=[];
+    for(const f of getRootFiles(currentSection)) gathered.push({file:f,folder:''});
+    for(const folder of getFolders(currentSection)){
+      for(const f of getFolderFiles(folder.id,currentSection)) gathered.push({file:f,folder:folder.name||''});
+    }
+
+    let uploaded=0;
+    for(const item of gathered){
+      const blob=await blobForPortfolioFile(item.file);
+      if(!blob) continue;
+      const path=`${session.user.id}/${token}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${safeSharedName(item.file.name)}`;
+      const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,blob,{
+        contentType:item.file.type||blob.type||'application/octet-stream',upsert:false
+      });
+      if(upErr){ console.warn(upErr); continue; }
+      const {data:pub}=sb.storage.from('shared-artifacts').getPublicUrl(path);
+      const {error:itemErr}=await sb.from('share_items').insert({
+        share_id:shareId,file_name:item.file.name||'ملف',mime_type:item.file.type||blob.type||null,
+        public_url:pub.publicUrl,folder_name:item.folder||null
+      });
+      if(!itemErr) uploaded++;
+    }
+
+    const url=`https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index25.html?share=${encodeURIComponent(token)}`;
+    currentSecureShareLink=url;
+    $('shareQrBox').innerHTML='';
+    new QRCode($('shareQrBox'),{text:url,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
+    $('shareLinkText').textContent=url;
+    $('shareLinkText').classList.remove('hidden');
+    $('copyShareBtn').classList.remove('hidden');
+    $('sendShareBtn').classList.remove('hidden');
+    toast(`تم إنشاء الرابط${uploaded?' ورفع '+uploaded+' ملف':''}`);
+  }catch(err){
+    console.error(err);
+    toast('تعذر إنشاء المشاركة. شغّلي ملف إعداد Supabase مرة واحدة.');
+  }
+}
+
+async function copySecureShare(){
+  if(!currentSecureShareLink) return;
+  await navigator.clipboard.writeText(currentSecureShareLink);
+  toast('تم نسخ الرابط');
+}
+async function sendSecureShare(){
+  if(!currentSecureShareLink) return;
+  if(navigator.share){
+    try{await navigator.share({title:'مشاركة من ملف الإنجاز',url:currentSecureShareLink});return}catch(e){}
+  }
+  await copySecureShare();
+}
+
+async function loadShareCenterSafe(){
+  const box=document.getElementById('shareCenterFeed');
+  if(!box) return;
+  box.innerHTML='<div class="empty-state">جاري التحميل...</div>';
+  try{
+    const {data:links,error}=await sb.from('share_links').select('*').order('created_at',{ascending:false});
+    if(error) throw error;
+    const {data:responses,error:rErr}=await sb.from('share_responses').select('*').order('created_at',{ascending:false});
+    if(rErr) throw rErr;
+    if(!links?.length){
+      box.innerHTML='<div class="empty-state">لا توجد روابط مشاركة بعد.<br><br><button class="action" type="button" onclick="closeModal(\'shareCenterModal\');setTimeout(openShareBuilder,80)">إنشاء باركود جديد</button></div>';
+      return;
+    }
+    box.innerHTML=links.map(l=>{
+      const rs=(responses||[]).filter(r=>r.share_id===l.id);
+      const role=l.access_role==='admin'?'الإدارة':'الأسرة';
+      const exp=l.expires_at?new Date(l.expires_at).toLocaleString('ar-SA'):'';
+      return `<div class="share-card"><b>${esc(l.title||l.section_key||'مشاركة')}</b>
+        <div class="share-meta">${role} • ينتهي: ${esc(exp)} ${l.revoked?'• ملغي':''}</div>
+        <div style="margin-top:7px">${rs.length?rs.map(r=>`<div class="feed-item"><strong>${esc(r.responder_name||'بدون اسم')}</strong> <span class="tag">${esc(r.status||r.response_type||'')}</span><br>${esc(r.note||'')}<br><small>${new Date(r.created_at).toLocaleString('ar-SA')}</small></div>`).join(''):'<small style="color:#756a5d">لا توجد استجابة حتى الآن.</small>'}</div>
+      </div>`;
+    }).join('');
+  }catch(err){
+    console.error(err);
+    box.innerHTML='<div class="empty-state">تعذر تحميل المشاركات، لكن يمكنك إنشاء باركود جديد.<br><br><button class="action" type="button" onclick="closeModal(\'shareCenterModal\');setTimeout(openShareBuilder,80)">إنشاء باركود جديد</button></div>';
+  }
+}
+
+async function resolveGuestShare(token){
+  const {data,error}=await sb.rpc('resolve_share_link',{p_token:token});
+  if(error) throw error;
+  if(!data || data.valid!==true) throw new Error('invalid share');
+  return data;
+}
+
+function setupSignatureCanvas(){
+  const c=$('signatureCanvas'); if(!c||c.dataset.ready) return;
+  c.dataset.ready='1';
+  const ctx=c.getContext('2d');ctx.lineWidth=4;ctx.lineCap='round';ctx.strokeStyle='#173d34';
+  let drawing=false;
+  function p(e){const r=c.getBoundingClientRect(),t=e.touches?.[0]||e;return{x:(t.clientX-r.left)*(c.width/r.width),y:(t.clientY-r.top)*(c.height/r.height)}}
+  function start(e){drawing=true;const a=p(e);ctx.beginPath();ctx.moveTo(a.x,a.y);e.preventDefault()}
+  function move(e){if(!drawing)return;const a=p(e);ctx.lineTo(a.x,a.y);ctx.stroke();e.preventDefault()}
+  function end(){drawing=false}
+  c.addEventListener('pointerdown',start);c.addEventListener('pointermove',move);window.addEventListener('pointerup',end);
+}
+function clearGuestSignature(){const c=$('signatureCanvas');c?.getContext('2d').clearRect(0,0,c.width,c.height)}
+async function fileToSmallDataUrl(input,maxBytes=650000){
+  const f=input?.files?.[0]; if(!f) return null;
+  if(f.size>maxBytes){toast('صورة الختم كبيرة؛ اختاري صورة أصغر');return null}
+  return await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
+}
+
+async function submitGuestApproval(){
+  try{
+    const name=$('guestAdminName').value.trim(); if(!name){toast('اكتبي اسم المعتمدة');return}
+    const signature=$('signatureCanvas').toDataURL('image/png');
+    const stamp=await fileToSmallDataUrl($('guestStampFile'));
+    const {data,error}=await sb.rpc('submit_share_response',{
+      p_token:currentGuestShare.token,p_type:'approval',p_name:name,
+      p_status:$('guestAdminStatus').value,p_note:$('guestAdminNote').value.trim(),
+      p_signature:signature,p_stamp:stamp
+    });
+    if(error) throw error;
+    toast('تم حفظ الاعتماد بنجاح');
+    $('guestAdminForm').innerHTML='<div class="feed-item"><strong>✅ تم إرسال الاعتماد للمعلمة.</strong></div>';
+  }catch(err){console.error(err);toast('تعذر حفظ الاعتماد')}
+}
+
+async function submitGuestRecommendation(){
+  try{
+    const name=$('guestFamilyName').value.trim()||'زائرة';
+    const note=$('guestFamilyNote').value.trim();if(!note){toast('اكتبي الرأي أو التوصية');return}
+    const {error}=await sb.rpc('submit_share_response',{
+      p_token:currentGuestShare.token,p_type:'recommendation',p_name:name,
+      p_status:'submitted',p_note:note,p_signature:null,p_stamp:null
+    });
+    if(error) throw error;
+    toast('تم إرسال التوصية');
+    $('guestFamilyForm').innerHTML='<div class="feed-item"><strong>✅ شكرًا، تم إرسال مشاركتك.</strong></div>';
+  }catch(err){console.error(err);toast('تعذر إرسال التوصية')}
+}
+
+async function handleShareGuestLink(){
+  const token=new URLSearchParams(location.search).get('share');
+  if(!token) return;
+  try{
+    document.body.classList.remove('cover-open');
+    $('cover').style.display='none';$('portfolio').style.display='none';
+    $('shareGuest').classList.add('active');
+    $('guestShareTitle').textContent='جاري فتح المشاركة...';
+    const data=await resolveGuestShare(token);
+    currentGuestShare={...data,token};
+    $('guestRoleBadge').textContent=data.role==='admin'?'🏫 دخول الإدارة / المشرفة':'👨‍👩‍👧 دخول الأسرة / الزائرة';
+    $('guestShareTitle').textContent=data.title||'ملف للمراجعة';
+    $('guestShareMeta').textContent=`القسم: ${data.section||''} • صلاحية الرابط حتى ${new Date(data.expires_at).toLocaleString('ar-SA')}`;
+    $('guestShareText').textContent=data.snapshot?.text||'لا يوجد نص مرفق.';
+    const files=data.items||[];
+    $('guestShareFiles').innerHTML=files.length?files.map(f=>`<div class="share-file"><span>${f.folder_name?'<small>'+esc(f.folder_name)+'</small><br>':''}<b>${esc(f.file_name)}</b></span><a href="${esc(f.public_url)}" target="_blank" rel="noopener">فتح الملف</a></div>`).join(''):'<div class="empty-state">لا توجد ملفات مرفقة.</div>';
+    $('guestAdminForm').classList.toggle('hidden',data.role!=='admin');
+    $('guestFamilyForm').classList.toggle('hidden',data.role!=='family');
+    if(data.role==='admin') setupSignatureCanvas();
+  }catch(err){
+    console.error(err);
+    $('guestShareTitle').textContent='الرابط غير متاح';
+    $('guestShareMeta').textContent='قد يكون الرابط منتهيًا أو ملغيًا.';
+    $('guestShareText').textContent='';
+    $('guestShareFiles').innerHTML='';
+  }
+}
+window.addEventListener('DOMContentLoaded',()=>setTimeout(handleShareGuestLink,30));
+
+</script>
+</body>
+</html>
