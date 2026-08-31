@@ -590,7 +590,9 @@ body.cover-open{overflow:hidden}
       <button class="action secondary admin-only manage-only" onclick="openSectionApprovalForm()">📨 إرسال للاعتماد</button>
       <button class="action secondary" type="button" onclick="openSectionSurvey()">📊 استبيان هذا القسم</button>
       <button class="action secondary" type="button" onclick="shareCurrentSection()">📤 إرسال القسم</button>
-      <button class="action secondary teacher-only" type="button" onclick="openShareBuilderSafe()">🔗 باركود للإدارة / الأسرة</button>
+      <button class="action secondary teacher-only" type="button" onclick="openExistingFileSharePicker()">👁️ مشاركة ملف للاطلاع</button>
+      <button class="action secondary teacher-only" type="button" onclick="usSelectedPortfolioFiles=[];unifiedShareOpen()">👁️ مشاركة القسم للاطلاع</button>
+      <button class="action secondary teacher-only" type="button" onclick="usSelectedPortfolioFiles=[];unifiedShareOpen()">🔗 باركود للإدارة / الأسرة</button>
       <button class="action secondary" type="button" onclick="printCurrentSection()">🖨️ طباعة القسم</button>
       <button class="action danger" onclick="clearSection()">حذف محتوى القسم</button>
     </div>
@@ -1183,9 +1185,9 @@ function buildFileCard(file,ctx){
   let prev=`<div class="file-preview"><span class="file-emoji">${extEmoji(file)}</span></div>`;
   if(file.data&&(file.type||'').startsWith('image/'))prev=`<div class="file-preview"><img src="${file.data}" alt="${esc(file.name)}"></div>`;
   else if(file.data&&(file.type||'').startsWith('video/'))prev=`<div class="file-preview"><video src="${file.data}" controls preload="metadata"></video></div>`;
-  c.innerHTML=`${prev}<div class="file-name" title="${esc(file.name)}">${esc(file.name)}</div><div class="file-meta">${fileSizeText(file.size)} • ${fmt(file.updatedAt||file.createdAt)}</div><div class="file-actions"><button class="mini" data-a="open">فتح</button><span class="teacher-only"><button class="mini" data-a="share">📤 إرسال</button><button class="mini" data-a="print">🖨️ طباعة</button><button class="mini" data-a="rename">تسمية</button><button class="mini" data-a="up">↑</button><button class="mini" data-a="down">↓</button><button class="mini" data-a="move">نقل</button><button class="mini danger" data-a="delete">حذف</button></span></div>`;
+  c.innerHTML=`${prev}<div class="file-name" title="${esc(file.name)}">${esc(file.name)}</div><div class="file-meta">${fileSizeText(file.size)} • ${fmt(file.updatedAt||file.createdAt)}</div><div class="file-actions"><button class="mini" data-a="open">فتح</button><span class="teacher-only"><button class="mini" data-a="share">👁️ مشاركة الملف للاطلاع</button><button class="mini" data-a="print">🖨️ طباعة</button><button class="mini" data-a="rename">تسمية</button><button class="mini" data-a="up">↑</button><button class="mini" data-a="down">↓</button><button class="mini" data-a="move">نقل</button><button class="mini danger" data-a="delete">حذف</button></span></div>`;
   c.querySelector('[data-a=open]')?.addEventListener('click',()=>openFile(file));
-  c.querySelector('[data-a=share]')?.addEventListener('click',()=>shareFile(file));
+  c.querySelector('[data-a=share]')?.addEventListener('click',()=>sharePortfolioFileForReview(file,ctx));
   c.querySelector('[data-a=print]')?.addEventListener('click',()=>printFile(file));
   c.querySelector('[data-a=rename]')?.addEventListener('click',()=>renameFile(file.id,ctx));
   c.querySelector('[data-a=up]')?.addEventListener('click',()=>moveFileOrder(file.id,ctx,-1));
@@ -2090,7 +2092,8 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(handleShareGuestLink,3
         <div class="us-field"><label>مدة الرابط</label><select id="usDays"><option value="1">يوم واحد</option><option value="3">3 أيام</option><option value="7" selected>7 أيام</option><option value="14">14 يومًا</option><option value="30">30 يومًا</option></select></div>
         <div class="us-field"><label>إرفاق ملفات للمراجعة</label><input id="usFilesInput" type="file" multiple></div>
       </div>
-      <div class="us-field" style="margin-top:12px"><label>ملاحظة للزائر (اختياري)</label><textarea id="usNote" placeholder="مثال: يرجى مراجعة الخطة واعتمادها."></textarea></div>
+      <div id="usExistingFilesHint" class="us-ok" style="margin-top:12px">سيتم إرفاق الملفات الموجودة داخل القسم تلقائيًا، ويمكنك أيضًا إضافة ملفات أخرى من الجهاز.</div>
+<div class="us-field" style="margin-top:12px"><label>ملاحظة للزائر (اختياري)</label><textarea id="usNote" placeholder="مثال: يرجى مراجعة الملف والاطلاع على محتواه ثم اعتماده."></textarea></div>
       <div class="us-actions"><button class="action" type="button" onclick="unifiedCreateShare()">إنشاء الرابط والباركود</button></div>
       <div id="usStatus"></div>
       <div id="usQr"><span style="color:#756a5d">سيظهر الباركود هنا</span></div>
@@ -2140,6 +2143,64 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(handleShareGuestLink,3
 let usShareUrl='';
 let usGuestData=null;
 let usPreviousScroll=0;
+let usSelectedPortfolioFiles=[];
+
+function usSectionKeyFromDisplay(display){
+  const found=(typeof items!=='undefined'?items:[]).find(i=>{
+    const key=i[1];
+    const shown=(typeof sectionDisplayName==='function')?sectionDisplayName(key):key;
+    return key===display || shown===display;
+  });
+  return found?found[1]:display;
+}
+
+
+function openExistingFileSharePicker(){
+  const all=[];
+  try{
+    for(const f of getRootFiles(currentSection)) all.push({file:f,ctx:{kind:'root'},folder:''});
+    for(const folder of getFolders(currentSection)){
+      for(const f of getFolderFiles(folder.id,currentSection)){
+        all.push({file:f,ctx:{kind:'folder',folderId:folder.id},folder:folder.name||''});
+      }
+    }
+  }catch(e){console.error(e)}
+  const box=document.getElementById('fileSharePickerList');
+  if(!all.length){
+    box.innerHTML='<div class="empty-state">لا توجد ملفات في هذا القسم حتى الآن.</div>';
+  }else{
+    box.innerHTML=all.map((x,i)=>`
+      <div class="file-card">
+        <div class="file-name">${esc(x.file.name||'ملف')}</div>
+        <div class="file-meta">${x.folder?('داخل: '+esc(x.folder)):'ملف القسم'}</div>
+        <div class="file-actions">
+          <button class="mini" type="button" onclick="chooseExistingFileForReview(${i})">👁️ مشاركة للاطلاع</button>
+        </div>
+      </div>`).join('');
+  }
+  window._existingShareFiles=all;
+  openModal('fileSharePickerModal');
+}
+function chooseExistingFileForReview(index){
+  const item=(window._existingShareFiles||[])[index];
+  if(!item)return;
+  closeModal('fileSharePickerModal');
+  sharePortfolioFileForReview(item.file,item.ctx);
+}
+
+async function sharePortfolioFileForReview(file,ctx){
+  usSelectedPortfolioFiles=[{file,ctx:ctx||{kind:'root'},section:currentSection,folder:ctx?.kind==='folder'?(getFolder(ctx.folderId,currentSection)?.name||''):''}];
+  unifiedShareOpen();
+  const sel=document.getElementById('usSection');
+  if(sel){
+    const shown=(typeof sectionDisplayName==='function')?sectionDisplayName(currentSection):currentSection;
+    const opt=[...sel.options].find(o=>o.value===shown||o.value===currentSection);
+    if(opt) sel.value=opt.value;
+  }
+  const hint=document.getElementById('usExistingFilesHint');
+  if(hint) hint.innerHTML='✅ سيتم إرسال هذا الملف للمراجعة: <b>'+esc(file.name||'ملف')+'</b><br>وسيظهر للإدارة زر «عرض المحتوى».';
+  document.getElementById('usNote').value='يرجى الاطلاع على محتوى الملف ثم كتابة الملاحظة أو الاعتماد.';
+}
 
 function usStatus(message,error=false){
   const el=document.getElementById('usStatus');
@@ -2163,6 +2224,10 @@ function unifiedShareOpen(){
     const found=[...sel.options].find(o=>o.value===display||o.value===currentSection);
     if(found) sel.value=found.value;
   }
+  const hint=document.getElementById('usExistingFilesHint');
+  if(hint && !usSelectedPortfolioFiles.length){
+    hint.innerHTML='✅ سيتم إرفاق <b>كل الملفات الموجودة داخل القسم المختار</b> تلقائيًا، ويمكنك أيضًا إضافة ملفات أخرى من الجهاز.';
+  }
   overlay?.classList.add('active');
   document.body.style.overflow='hidden';
   overlay?.scrollTo(0,0);
@@ -2181,47 +2246,70 @@ async function unifiedCreateShare(){
     const {data:{session}}=await sb.auth.getSession();
     if(!session) throw new Error('يلزم تسجيل دخول المعلمة بحساب Microsoft أولًا.');
 
-    const section=document.getElementById('usSection').value;
+    const sectionDisplay=document.getElementById('usSection').value;
+    const sectionKey=usSectionKeyFromDisplay(sectionDisplay);
     const role=document.getElementById('usRole').value;
     const days=Number(document.getElementById('usDays').value||7);
     const note=document.getElementById('usNote').value.trim();
+    const sectionText=localStorage.getItem(NS+'text_'+sectionKey)||'';
 
     const {data,error}=await sb.rpc('create_share_link',{
-      p_role:role,p_section:section,p_title:section,p_snapshot:{text:note},p_days:days
+      p_role:role,p_section:sectionKey,p_title:sectionDisplay,
+      p_snapshot:{text:note,section_text:sectionText},p_days:days
     });
     if(error) throw error;
 
     const token=data.token, shareId=data.id;
-    const picked=[...(document.getElementById('usFilesInput').files||[])];
+    let portfolioFiles=[];
 
-    for(const file of picked){
-      const path=`${session.user.id}/${token}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${usSafeName(file.name)}`;
-      const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,file,{contentType:file.type||'application/octet-stream',upsert:false});
-      if(upErr) throw upErr;
-
-      const {data:signed,error:signedErr}=await sb.storage.from('shared-artifacts').createSignedUrl(path,days*86400);
-      if(signedErr) throw signedErr;
-
-      const {error:itemErr}=await sb.from('share_items').insert({
-        share_id:shareId,file_name:file.name,mime_type:file.type||null,public_url:signed.signedUrl,folder_name:null
-      });
-      if(itemErr) throw itemErr;
+    if(usSelectedPortfolioFiles.length){
+      portfolioFiles=[...usSelectedPortfolioFiles];
+    }else{
+      for(const f of getRootFiles(sectionKey)) portfolioFiles.push({file:f,section:sectionKey,folder:''});
+      for(const folder of getFolders(sectionKey)){
+        for(const f of getFolderFiles(folder.id,sectionKey)){
+          portfolioFiles.push({file:f,section:sectionKey,folder:folder.name||''});
+        }
+      }
     }
+
+    let uploaded=0, skipped=0;
+
+    async function uploadOne(file,folderName=''){
+      const blob=file.storage ? await blobForPortfolioFile(file) : file;
+      if(!blob){skipped++;return}
+      const name=file.name||'ملف';
+      const type=file.type||blob.type||'application/octet-stream';
+      const path=`${session.user.id}/${token}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${usSafeName(name)}`;
+      const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,blob,{contentType:type,upsert:false});
+      if(upErr){console.warn(upErr);skipped++;return}
+      const {data:signed,error:signedErr}=await sb.storage.from('shared-artifacts').createSignedUrl(path,days*86400);
+      if(signedErr){console.warn(signedErr);skipped++;return}
+      const {error:itemErr}=await sb.from('share_items').insert({
+        share_id:shareId,file_name:name,mime_type:type,public_url:signed.signedUrl,folder_name:folderName||null
+      });
+      if(itemErr){console.warn(itemErr);skipped++;return}
+      uploaded++;
+    }
+
+    for(const item of portfolioFiles) await uploadOne(item.file,item.folder||'');
+
+    const picked=[...(document.getElementById('usFilesInput').files||[])];
+    for(const file of picked) await uploadOne(file,'مرفق إضافي');
 
     usShareUrl='https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index25.html?share='+encodeURIComponent(token);
     const qr=document.getElementById('usQr');
     qr.innerHTML='';
-    if(window.QRCode){
-      new QRCode(qr,{text:usShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
-    }else{
-      qr.innerHTML='<b>تم إنشاء الرابط. استخدمي زر نسخ الرابط.</b>';
-    }
+    if(window.QRCode) new QRCode(qr,{text:usShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
+    else qr.innerHTML='<b>تم إنشاء الرابط. استخدمي زر نسخ الرابط.</b>';
+
     const urlEl=document.getElementById('usUrl');
-    urlEl.textContent=usShareUrl;
-    urlEl.classList.remove('hidden');
+    urlEl.textContent=usShareUrl; urlEl.classList.remove('hidden');
     document.getElementById('usCopyBtn').classList.remove('hidden');
     document.getElementById('usSendBtn').classList.remove('hidden');
-    usStatus('تم إنشاء رابط المشاركة والباركود بنجاح.');
+
+    usStatus(`✅ تم إنشاء المشاركة وإرفاق ${uploaded} ملف للاطلاع${skipped?` — تعذر إرفاق ${skipped} ملف`:''}.`);
+    usSelectedPortfolioFiles=[];
   }catch(e){
     console.error(e);
     usStatus(e?.message||'تعذر إنشاء المشاركة.',true);
@@ -2310,11 +2398,16 @@ async function unifiedLoadGuest(){
     document.getElementById('usGuestBadge').textContent=data.role==='admin'?'🏫 الإدارة / المشرفة':'👨‍👩‍👧 الأسرة / الزائرة';
     document.getElementById('usGuestHeading').textContent=data.title||'ملف للمراجعة';
     document.getElementById('usGuestMeta').textContent='صالح حتى: '+new Date(data.expires_at).toLocaleString('ar-SA');
-    document.getElementById('usGuestNote').textContent=data.snapshot?.text||'لا توجد ملاحظة.';
+    const teacherNote=data.snapshot?.text||'';
+    const sectionText=data.snapshot?.section_text||'';
+    document.getElementById('usGuestNote').innerHTML=
+      (teacherNote?'<b>ملاحظة المعلمة:</b><br>'+esc(teacherNote):'')+
+      (sectionText?'<br><br><b>محتوى القسم:</b><br><div style="white-space:pre-wrap">'+esc(sectionText)+'</div>':'')||
+      'لا توجد ملاحظة.';
     const files=data.items||[];
     document.getElementById('usGuestFiles').innerHTML=files.length
-      ? files.map(f=>`<div class="us-file"><b>${String(f.file_name||'ملف').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}</b><a href="${f.public_url}" target="_blank" rel="noopener">فتح الملف</a></div>`).join('')
-      : '<div class="us-ok">لا توجد ملفات مرفقة.</div>';
+      ? files.map(f=>`<div class="us-file"><div><b>${String(f.file_name||'ملف').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}</b>${f.folder_name?'<br><small>'+esc(f.folder_name)+'</small>':''}</div><a class="action secondary" href="${f.public_url}" target="_blank" rel="noopener">👁️ عرض المحتوى</a></div>`).join('')
+      : '<div class="us-err">لم يتم إرفاق ملفات في هذه المشاركة.</div>';
 
     document.getElementById('usAdminForm').classList.toggle('hidden',data.role!=='admin');
     document.getElementById('usFamilyForm').classList.toggle('hidden',data.role!=='family');
@@ -2327,5 +2420,14 @@ async function unifiedLoadGuest(){
 window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
 </script>
 
+
+<div class="modal" id="fileSharePickerModal"><div class="modal-card">
+  <div class="modal-head">
+    <h3>👁️ مشاركة ملف للاطلاع</h3>
+    <button class="back" type="button" onclick="closeModal('fileSharePickerModal')">إغلاق</button>
+  </div>
+  <div class="viewer-note">اختاري الملف الذي تريدين إرساله للإدارة أو الأسرة للاطلاع على محتواه.</div>
+  <div id="fileSharePickerList" class="files-grid" style="margin-top:12px"></div>
+</div></div>
 </body>
 </html>
