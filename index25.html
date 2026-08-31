@@ -966,6 +966,11 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
 });
 
 async function signInWithMicrosoft(){
+  if(sharedPortfolioToken){
+    openPortfolio();
+    applyRole();
+    return;
+  }
   try{
     const {data:{session}}=await sb.auth.getSession();
 
@@ -1198,7 +1203,9 @@ function toggleFileView(){fileViewMode=fileViewMode==='grid'?'list':'grid';rende
 function buildFileCard(file,ctx){
   const c=document.createElement('div');c.className='file-card';c.dataset.fileId=file.id;
   let prev=`<div class="file-preview"><span class="file-emoji">${extEmoji(file)}</span></div>`;
-  if(file.data&&(file.type||'').startsWith('image/'))prev=`<div class="file-preview"><img src="${file.data}" alt="${esc(file.name)}"></div>`;
+  if(file.cloud_url&&(file.type||'').startsWith('image/'))prev=`<div class="file-preview"><img src="${file.cloud_url}" alt="${esc(file.name)}"></div>`;
+  else if(file.cloud_url&&(file.type||'').startsWith('video/'))prev=`<div class="file-preview"><video src="${file.cloud_url}" controls preload="metadata"></video></div>`;
+  else if(file.data&&(file.type||'').startsWith('image/'))prev=`<div class="file-preview"><img src="${file.data}" alt="${esc(file.name)}"></div>`;
   else if(file.data&&(file.type||'').startsWith('video/'))prev=`<div class="file-preview"><video src="${file.data}" controls preload="metadata"></video></div>`;
   c.innerHTML=`${prev}<div class="file-name" title="${esc(file.name)}">${esc(file.name)}</div><div class="file-meta">${fileSizeText(file.size)} • ${fmt(file.updatedAt||file.createdAt)}</div><div class="file-actions"><button class="mini" data-a="open">فتح</button><span class="teacher-only"><button class="mini" data-a="share">👁️ مشاركة الملف للاطلاع</button><button class="mini" data-a="print">🖨️ طباعة</button><button class="mini" data-a="rename">تسمية</button><button class="mini" data-a="up">↑</button><button class="mini" data-a="down">↓</button><button class="mini" data-a="move">نقل</button><button class="mini danger" data-a="delete">حذف</button></span></div>`;
   c.querySelector('[data-a=open]')?.addEventListener('click',()=>openFile(file));
@@ -1220,6 +1227,11 @@ async function hydratePreview(card,file){
   }catch(e){console.error(e)}
 }
 async function openFile(file){
+  if(file.cloud_url){
+    const w=window.open(file.cloud_url,'_blank','noopener');
+    if(!w) location.href=file.cloud_url;
+    return;
+  }
   if(file.data){const w=window.open();if(w){if((file.type||'').startsWith('image/'))w.document.write(`<img src="${file.data}" style="max-width:100%;height:auto">`);else if((file.type||'').startsWith('video/'))w.document.write(`<video src="${file.data}" controls autoplay style="max-width:100%"></video>`);else w.location=file.data}return}
   const blob=await idbGetFile(file.id);if(!blob){toast('تعذر العثور على الملف على هذا الجهاز');return}const url=URL.createObjectURL(blob);const w=window.open(url,'_blank');if(!w){const a=document.createElement('a');a.href=url;a.download=file.name;a.click()}setTimeout(()=>URL.revokeObjectURL(url),60000)
 }
@@ -1781,7 +1793,9 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(surveyLoadPublic,80));
 
 function cloudInfo(){alert('بما أن لديك حساب Microsoft، فهذا يساعدنا في مرحلة الدخول الحقيقي. الربط النهائي سيكون عبر Supabase للحفظ السحابي والصلاحيات، ثم إعداد تسجيل الدخول بواسطة Microsoft / Microsoft Entra إذا كان حسابك المؤسسي يسمح بذلك. هذه النسخة الحالية لا تسجل الدخول إلى Microsoft تلقائيًا بعد؛ تحتاج مرحلة إعداد آمنة تشمل مشروع Supabase وإعداد تطبيق Microsoft وربط عنوان الموقع. بعدها يمكن للمعلمة والإدارة والأسرة الدخول بحسابات منفصلة وتظهر الملفات والاعتمادات والاستبيانات بين الأجهزة.')}
 
-const isManageMode = new URLSearchParams(window.location.search).get('public') !== '1';
+const sharedPortfolioToken = new URLSearchParams(window.location.search).get('portfolio_share');
+let sharedViewRole = 'family';
+const isManageMode = !sharedPortfolioToken && new URLSearchParams(window.location.search).get('public') !== '1';
 
 function setRole(role){
   if($('roleSelect')) $('roleSelect').value=role;
@@ -1793,7 +1807,7 @@ function updateRoleCards(role){
 }
 
 function applyRole(){
-  const role = isManageMode ? ($('roleSelect')?.value || 'teacher') : 'family';
+  const role = isManageMode ? ($('roleSelect')?.value || 'teacher') : (sharedViewRole || 'family');
 
   document.body.classList.toggle('public-view', !isManageMode);
 
@@ -1825,6 +1839,10 @@ function applyRole(){
 
   if($('publicBanner')) $('publicBanner').classList.toggle('hidden', isManageMode);
   if($('publicRecommendFab')) $('publicRecommendFab').classList.toggle('hidden', isManageMode);
+  if(!isManageMode){
+    document.querySelectorAll('#panel .actions, .folders-toolbar').forEach(el=>el.classList.add('hidden'));
+  }
+
 
   // في وضع المشاهدة العامة نظهر الأقسام السفلية كلها.
   // التوصيات تبقى تفاعلية، والبقية تظهر للعرض فقط بدون صلاحيات إدارة.
@@ -2350,6 +2368,7 @@ function fpAllSections(){
 
 async function fpCollectSnapshot(){
   const sections=[];
+  const aliases=sectionAliases();
   for(const sec of fpAllSections()){
     const sectionText=localStorage.getItem(NS+'text_'+sec.key)||'';
     const folders=getFolders(sec.key)||[];
@@ -2359,11 +2378,18 @@ async function fpCollectSnapshot(){
       key:sec.key,
       label:sec.label,
       text:sectionText,
-      folders:folders.map(f=>({id:f.id,name:f.name||'مجلد'})),
-      root_files:rootFiles.map(f=>({id:f.id,name:f.name||'ملف',type:f.type||''}))
+      root_files:rootFiles.map(f=>({
+        id:f.id,name:f.name||'ملف',type:f.type||'',size:f.size||0,
+        createdAt:f.createdAt||Date.now(),updatedAt:f.updatedAt||f.createdAt||Date.now()
+      })),
+      folders:folders.map(f=>({
+        id:f.id,name:f.name||'مجلد',icon:f.icon||'📁',color:f.color||'#2f5d50',
+        cover:f.cover||null,createdAt:f.createdAt||Date.now(),updatedAt:f.updatedAt||f.createdAt||Date.now(),
+        note:localStorage.getItem(NS+folderNoteKey(sec.key,f.id))||''
+      }))
     });
   }
-  return sections;
+  return {aliases,sections};
 }
 
 async function fpUploadStoredFile(file, session, token, shareId, days, folderName, sectionLabel){
@@ -2402,14 +2428,20 @@ async function createFullPortfolioShare(){
     const role=document.getElementById('fpsRole').value;
     const days=Number(document.getElementById('fpsDays').value||7);
     const note=document.getElementById('fpsNote').value.trim();
-    const sections=await fpCollectSnapshot();
+    const collected=await fpCollectSnapshot();
 
     const rpcRole=role==='viewer'?'family':role;
     const {data,error}=await sb.rpc('create_share_link',{
       p_role:rpcRole,
       p_section:'__FULL_PORTFOLIO__',
       p_title:'ملف الإنجاز المهني كامل',
-      p_snapshot:{full_portfolio:true,viewer_role:role,note,sections},
+      p_snapshot:{
+        full_portfolio:true,
+        viewer_role:role,
+        note,
+        aliases:collected.aliases,
+        sections:collected.sections
+      },
       p_days:days
     });
     if(error) throw error;
@@ -2504,24 +2536,91 @@ function fpRenderPublic(data){
   }).join('');
 }
 
+function fpSharedFileMeta(f,index){
+  return {
+    id:'shared_'+index+'_'+Math.random().toString(36).slice(2,7),
+    name:f.file_name||'ملف',
+    type:f.mime_type||'application/octet-stream',
+    size:0,
+    storage:'shared',
+    cloud_url:f.public_url,
+    createdAt:Date.now(),
+    updatedAt:Date.now()
+  };
+}
+
+function fpHydrateMirror(data){
+  const snapshot=data.snapshot||{};
+  const sections=snapshot.sections||[];
+  setJSON('sectionAliases',snapshot.aliases||{});
+
+  const itemGroups={};
+  (data.items||[]).forEach((f,i)=>{
+    const parts=String(f.folder_name||'').split(' / ').filter(Boolean);
+    const secLabel=parts.shift()||'';
+    const folderName=parts.join(' / ');
+    const key=secLabel+'|||'+folderName;
+    (itemGroups[key] ||= []).push(fpSharedFileMeta(f,i));
+  });
+
+  sections.forEach(sec=>{
+    localStorage.setItem(NS+'text_'+sec.key,sec.text||'');
+
+    const folders=(sec.folders||[]).map(f=>({
+      id:String(f.id),name:f.name||'مجلد',icon:f.icon||'📁',
+      color:f.color||'#2f5d50',cover:f.cover||null,
+      createdAt:f.createdAt||Date.now(),updatedAt:f.updatedAt||Date.now()
+    }));
+    setJSON('folders_'+sec.key,folders);
+
+    const rootKey=(sec.label||sectionDisplayName(sec.key))+'|||';
+    setJSON('rootFiles_'+sec.key,itemGroups[rootKey]||[]);
+
+    folders.forEach(folder=>{
+      const saved=(sec.folders||[]).find(x=>String(x.id)===String(folder.id))||{};
+      localStorage.setItem(NS+folderNoteKey(sec.key,folder.id),saved.note||'');
+      const k=(sec.label||sectionDisplayName(sec.key))+'|||'+(folder.name||'');
+      setJSON(folderFilesKey(sec.key,folder.id),itemGroups[k]||[]);
+    });
+  });
+}
+
 async function loadFullPortfolioPublic(){
-  const token=new URLSearchParams(location.search).get('portfolio_share');
+  const token=sharedPortfolioToken;
   if(!token)return;
 
   try{
-    document.body.classList.remove('cover-open');
-    document.getElementById('cover')?.style.setProperty('display','none');
-    document.getElementById('portfolio')?.style.setProperty('display','none');
-    document.getElementById('panel')?.classList.remove('active');
-    document.getElementById('fullPortfolioPublicPage').classList.add('active');
-
     const {data,error}=await sb.rpc('resolve_share_link_v2',{p_token:token});
     if(error)throw error;
     if(!data?.valid || !data.snapshot?.full_portfolio)throw new Error('invalid');
 
-    fpRenderPublic(data);
+    fullPortfolioPublicData=data;
+    sharedViewRole=(data.snapshot?.viewer_role==='admin')?'admin':'family';
+    fpHydrateMirror(data);
+
+    document.getElementById('fullPortfolioPublicPage')?.classList.remove('active');
+    document.getElementById('cover').style.display='grid';
+    document.getElementById('portfolio').style.display='none';
+    document.body.classList.add('cover-open');
+
+    renderCards();
+    renderSideNav();
+    applyRole();
+
+    const teacherCard=document.getElementById('roleTeacherCard');
+    if(teacherCard) teacherCard.classList.add('hidden');
+    if(document.getElementById('roleAdminCard')) document.getElementById('roleAdminCard').disabled=true;
+    if(document.getElementById('roleFamilyCard')) document.getElementById('roleFamilyCard').disabled=true;
+
+    const banner=document.getElementById('publicBanner');
+    if(banner){
+      banner.classList.remove('hidden');
+      banner.innerHTML='<b>👁️ نسخة للاطلاع فقط</b><br>نفس ملف الإنجاز في الترتيب والمحتوى والمنظر، بدون صلاحية تعديل أو حذف أو رفع.';
+    }
   }catch(e){
     console.error(e);
+    document.getElementById('cover').style.display='none';
+    document.getElementById('portfolio').style.display='none';
     document.getElementById('fullPortfolioPublicPage').classList.add('active');
     document.getElementById('fppClosed').classList.remove('hidden');
     document.getElementById('fppContent').classList.add('hidden');
