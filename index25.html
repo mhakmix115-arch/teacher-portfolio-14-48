@@ -500,6 +500,19 @@ body.cover-open{overflow:hidden}
 .survey-public-page.active{display:block}.survey-public-shell{width:min(94%,760px);margin:auto;background:#fffdf8;border:2px solid var(--gold);border-radius:26px;padding:18px;box-shadow:0 12px 36px #0001}.survey-public-brand{color:var(--gold);font-weight:900}.survey-public-shell h1{color:var(--green);font-size:28px;margin:6px 0}.survey-public-desc{line-height:1.9;color:#5f594f;margin-bottom:8px}.survey-public-q{border:1px solid var(--line);border-radius:16px;background:#fff;padding:13px;margin:10px 0}.survey-public-q h3{font-size:16px;color:var(--green);margin:0 0 9px}.survey-choice{display:flex;gap:8px;align-items:center;padding:7px 4px}.survey-choice input{width:auto}.survey-alert{border:1px solid #e6b5aa;background:#fff2ef;border-radius:14px;padding:12px;color:#8a3e32;margin:12px 0}
 @media(max-width:600px){.survey-bar-row{grid-template-columns:90px 1fr 45px}.survey-pro-card{padding:13px}}
 
+
+/* ===== مشاركة ملف الإنجاز كاملًا ===== */
+.full-portfolio-public-shell{width:min(96%,980px)}
+.full-portfolio-sections{display:grid;gap:12px;margin-top:14px}
+.full-portfolio-section{border:1px solid var(--line);border-radius:18px;background:#fff;padding:14px}
+.full-portfolio-section h3{margin:0;color:var(--green)}
+.full-portfolio-section .fp-text{white-space:pre-wrap;line-height:1.9;margin:8px 0;color:#554f47}
+.full-portfolio-folder{border:1px dashed var(--gold);border-radius:14px;padding:10px;margin-top:9px;background:#fffaf1}
+.full-portfolio-files{display:grid;gap:7px;margin-top:8px}
+.full-portfolio-file{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--line);border-radius:12px;padding:8px;background:#fff}
+.full-portfolio-file a{text-decoration:none}
+.full-portfolio-empty{color:#8a8175;font-size:12px;padding:6px 0}
+
 </style>
 </head>
 <body class="cover-open">
@@ -592,6 +605,7 @@ body.cover-open{overflow:hidden}
       <button class="action secondary" type="button" onclick="shareCurrentSection()">📤 إرسال القسم</button>
       <button class="action secondary teacher-only" type="button" onclick="openExistingFileSharePicker()">👁️ مشاركة ملف للاطلاع</button>
       <button class="action secondary teacher-only" type="button" onclick="usSelectedPortfolioFiles=[];unifiedShareOpen()">👁️ مشاركة القسم للاطلاع</button>
+      <button class="action secondary teacher-only" type="button" onclick="fullPortfolioShareOpen()">👁️ مشاركة ملف الإنجاز كامل للاطلاع</button>
       <button class="action secondary teacher-only" type="button" onclick="usSelectedPortfolioFiles=[];unifiedShareOpen()">🔗 باركود للإدارة / الأسرة</button>
       <button class="action secondary" type="button" onclick="printCurrentSection()">🖨️ طباعة القسم</button>
       <button class="action danger" onclick="clearSection()">حذف محتوى القسم</button>
@@ -2315,6 +2329,234 @@ async function unifiedCreateShare(){
     usStatus(e?.message||'تعذر إنشاء المشاركة.',true);
   }
 }
+
+let fullPortfolioShareUrl='';
+let fullPortfolioPublicData=null;
+
+function fullPortfolioShareOpen(){
+  document.getElementById('fpsStatus').innerHTML='';
+  document.getElementById('fpsShareBox').classList.add('hidden');
+  document.getElementById('fpsUrl').textContent='';
+  document.getElementById('fpsQr').innerHTML='';
+  openModal('fullPortfolioShareModal');
+}
+
+function fpAllSections(){
+  try{
+    return (typeof items!=='undefined'?items:[]).map(i=>({key:i[1],label:sectionDisplayName(i[1])}));
+  }catch(e){ return []; }
+}
+
+async function fpCollectSnapshot(){
+  const sections=[];
+  for(const sec of fpAllSections()){
+    const sectionText=localStorage.getItem(NS+'text_'+sec.key)||'';
+    const folders=getFolders(sec.key)||[];
+    const rootFiles=getRootFiles(sec.key)||[];
+
+    sections.push({
+      key:sec.key,
+      label:sec.label,
+      text:sectionText,
+      folders:folders.map(f=>({id:f.id,name:f.name||'مجلد'})),
+      root_files:rootFiles.map(f=>({id:f.id,name:f.name||'ملف',type:f.type||''}))
+    });
+  }
+  return sections;
+}
+
+async function fpUploadStoredFile(file, session, token, shareId, days, folderName, sectionLabel){
+  const blob=await blobForPortfolioFile(file);
+  if(!blob) return false;
+
+  const name=file.name||'ملف';
+  const type=file.type||blob.type||'application/octet-stream';
+  const path=`${session.user.id}/${token}/full/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${usSafeName(name)}`;
+
+  const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,blob,{contentType:type,upsert:false});
+  if(upErr){console.warn(upErr);return false}
+
+  const {data:signed,error:signedErr}=await sb.storage.from('shared-artifacts').createSignedUrl(path,days*86400);
+  if(signedErr){console.warn(signedErr);return false}
+
+  const joinedFolder=[sectionLabel,folderName].filter(Boolean).join(' / ');
+  const {error:itemErr}=await sb.from('share_items').insert({
+    share_id:shareId,
+    file_name:name,
+    mime_type:type,
+    public_url:signed.signedUrl,
+    folder_name:joinedFolder||sectionLabel||null
+  });
+  if(itemErr){console.warn(itemErr);return false}
+  return true;
+}
+
+async function createFullPortfolioShare(){
+  const status=document.getElementById('fpsStatus');
+  status.innerHTML='';
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session) throw new Error('يلزم تسجيل دخول المعلمة بحساب Microsoft أولًا.');
+
+    const role=document.getElementById('fpsRole').value;
+    const days=Number(document.getElementById('fpsDays').value||7);
+    const note=document.getElementById('fpsNote').value.trim();
+    const sections=await fpCollectSnapshot();
+
+    const rpcRole=role==='viewer'?'family':role;
+    const {data,error}=await sb.rpc('create_share_link',{
+      p_role:rpcRole,
+      p_section:'__FULL_PORTFOLIO__',
+      p_title:'ملف الإنجاز المهني كامل',
+      p_snapshot:{full_portfolio:true,viewer_role:role,note,sections},
+      p_days:days
+    });
+    if(error) throw error;
+
+    const token=data.token, shareId=data.id;
+    let uploaded=0, skipped=0;
+
+    for(const sec of fpAllSections()){
+      for(const f of getRootFiles(sec.key)||[]){
+        if(await fpUploadStoredFile(f,session,token,shareId,days,'',sec.label)) uploaded++; else skipped++;
+      }
+      for(const folder of getFolders(sec.key)||[]){
+        for(const f of getFolderFiles(folder.id,sec.key)||[]){
+          if(await fpUploadStoredFile(f,session,token,shareId,days,folder.name||'مجلد',sec.label)) uploaded++; else skipped++;
+        }
+      }
+    }
+
+    fullPortfolioShareUrl=`${location.origin}${location.pathname}?portfolio_share=${encodeURIComponent(token)}`;
+    document.getElementById('fpsUrl').textContent=fullPortfolioShareUrl;
+    document.getElementById('fpsShareBox').classList.remove('hidden');
+    const qr=document.getElementById('fpsQr');qr.innerHTML='';
+    if(window.QRCode) new QRCode(qr,{text:fullPortfolioShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
+    else qr.innerHTML='<b>تم إنشاء الرابط.</b>';
+
+    status.innerHTML=`<div class="us-ok">✅ تم إنشاء رابط اطلاع كامل وإرفاق ${uploaded} ملف${skipped?` — تعذر إرفاق ${skipped} ملف`:''}.</div>`;
+  }catch(e){
+    console.error(e);
+    status.innerHTML=`<div class="us-err">${esc(e.message||'تعذر إنشاء الرابط')}</div>`;
+  }
+}
+
+async function copyFullPortfolioShare(){
+  if(!fullPortfolioShareUrl)return;
+  await navigator.clipboard.writeText(fullPortfolioShareUrl);
+  toast('تم نسخ الرابط');
+}
+async function sendFullPortfolioShare(){
+  if(!fullPortfolioShareUrl)return;
+  if(navigator.share){
+    try{await navigator.share({title:'ملف الإنجاز المهني — للاطلاع',url:fullPortfolioShareUrl});return}catch(e){}
+  }
+  await copyFullPortfolioShare();
+}
+
+function fpGroupFilesBySection(items){
+  const groups={};
+  for(const f of (items||[])){
+    const path=(f.folder_name||'').split(' / ');
+    const section=path[0]||'ملفات';
+    const folder=path.slice(1).join(' / ')||'';
+    if(!groups[section])groups[section]={root:[],folders:{}};
+    if(folder){
+      if(!groups[section].folders[folder])groups[section].folders[folder]=[];
+      groups[section].folders[folder].push(f);
+    }else groups[section].root.push(f);
+  }
+  return groups;
+}
+
+function fpRenderPublic(data){
+  fullPortfolioPublicData=data;
+  document.getElementById('fppTitle').textContent=data.title||'ملف الإنجاز المهني';
+  document.getElementById('fppNote').textContent=data.snapshot?.note||'';
+  document.getElementById('fppMeta').textContent=data.expires_at?`الرابط متاح حتى ${new Date(data.expires_at).toLocaleString('ar-SA')}`:'';
+
+  const viewerRole=data.snapshot?.viewer_role||data.role||'viewer';
+  document.getElementById('fppAdminFields').classList.toggle('hidden',viewerRole!=='admin');
+
+  const groups=fpGroupFilesBySection(data.items||[]);
+  const sections=data.snapshot?.sections||[];
+  const box=document.getElementById('fppSections');
+
+  box.innerHTML=sections.map(sec=>{
+    const g=groups[sec.label]||{root:[],folders:{}};
+    const rootHtml=g.root.length
+      ? `<div class="full-portfolio-files">${g.root.map(f=>`<div class="full-portfolio-file"><span>${esc(f.file_name||'ملف')}</span><a class="action secondary" href="${f.public_url}" target="_blank" rel="noopener">👁️ عرض</a></div>`).join('')}</div>`
+      : '';
+    const folderHtml=Object.entries(g.folders).map(([name,files])=>`
+      <div class="full-portfolio-folder"><b>📁 ${esc(name)}</b>
+        <div class="full-portfolio-files">${files.map(f=>`<div class="full-portfolio-file"><span>${esc(f.file_name||'ملف')}</span><a class="action secondary" href="${f.public_url}" target="_blank" rel="noopener">👁️ عرض</a></div>`).join('')}</div>
+      </div>`).join('');
+
+    const hasAny=sec.text||rootHtml||folderHtml;
+    return `<div class="full-portfolio-section">
+      <h3>${esc(sec.label)}</h3>
+      ${sec.text?`<div class="fp-text">${esc(sec.text)}</div>`:''}
+      ${rootHtml}
+      ${folderHtml}
+      ${hasAny?'':'<div class="full-portfolio-empty">لا يوجد محتوى مضاف في هذا القسم.</div>'}
+    </div>`;
+  }).join('');
+}
+
+async function loadFullPortfolioPublic(){
+  const token=new URLSearchParams(location.search).get('portfolio_share');
+  if(!token)return;
+
+  try{
+    document.body.classList.remove('cover-open');
+    document.getElementById('cover')?.style.setProperty('display','none');
+    document.getElementById('portfolio')?.style.setProperty('display','none');
+    document.getElementById('panel')?.classList.remove('active');
+    document.getElementById('fullPortfolioPublicPage').classList.add('active');
+
+    const {data,error}=await sb.rpc('resolve_share_link_v2',{p_token:token});
+    if(error)throw error;
+    if(!data?.valid || !data.snapshot?.full_portfolio)throw new Error('invalid');
+
+    fpRenderPublic(data);
+  }catch(e){
+    console.error(e);
+    document.getElementById('fullPortfolioPublicPage').classList.add('active');
+    document.getElementById('fppClosed').classList.remove('hidden');
+    document.getElementById('fppContent').classList.add('hidden');
+  }
+}
+
+async function submitFullPortfolioFeedback(){
+  const msg=document.getElementById('fppMessage');
+  try{
+    const token=new URLSearchParams(location.search).get('portfolio_share');
+    const role=fullPortfolioPublicData?.snapshot?.viewer_role||fullPortfolioPublicData?.role||'viewer';
+    const type=role==='admin'?'approval':'recommendation';
+    const status=role==='admin'?(document.getElementById('fppStatus').value||'reviewed'):null;
+    const note=document.getElementById('fppFeedback').value.trim();
+    const name=document.getElementById('fppName').value.trim()||null;
+    if(!note)throw new Error('اكتبي الرأي أو الملاحظة.');
+
+    const {error}=await sb.rpc('submit_share_response',{
+      p_token:token,
+      p_type:type,
+      p_name:name,
+      p_status:status,
+      p_note:note,
+      p_signature:null,
+      p_stamp:null
+    });
+    if(error)throw error;
+    msg.innerHTML='<div class="us-ok">✅ تم إرسال الرأي بنجاح.</div>';
+  }catch(e){
+    console.error(e);
+    msg.innerHTML=`<div class="us-err">${esc(e.message||'تعذر إرسال الرأي')}</div>`;
+  }
+}
+
+window.addEventListener('DOMContentLoaded',()=>setTimeout(loadFullPortfolioPublic,120));
+
 async function unifiedCopyShare(){
   if(!usShareUrl)return;
   await navigator.clipboard.writeText(usShareUrl);
@@ -2429,5 +2671,87 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
   <div class="viewer-note">اختاري الملف الذي تريدين إرساله للإدارة أو الأسرة للاطلاع على محتواه.</div>
   <div id="fileSharePickerList" class="files-grid" style="margin-top:12px"></div>
 </div></div>
+
+<!-- مشاركة ملف الإنجاز كاملًا للاطلاع فقط -->
+<div class="modal" id="fullPortfolioShareModal"><div class="modal-card survey-pro-card">
+  <div class="modal-head">
+    <h3>👁️ مشاركة ملف الإنجاز كامل للاطلاع</h3>
+    <button class="back" type="button" onclick="closeModal('fullPortfolioShareModal')">إغلاق</button>
+  </div>
+  <div class="viewer-note">
+    ينشئ رابطًا للعرض فقط: الغلاف + جميع الأقسام + المجلدات + الملفات. الزائر لا يستطيع التعديل أو الحذف أو الرفع.
+  </div>
+  <div class="form-grid" style="margin-top:12px">
+    <div class="field">
+      <label>نوع الزائر</label>
+      <select id="fpsRole">
+        <option value="admin">الإدارة / المشرفة</option>
+        <option value="family">الأسرة / الزائرة</option>
+        <option value="viewer">اطلاع فقط</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>مدة صلاحية الرابط</label>
+      <select id="fpsDays">
+        <option value="1">يوم واحد</option>
+        <option value="3">3 أيام</option>
+        <option value="7" selected>7 أيام</option>
+        <option value="14">14 يومًا</option>
+        <option value="30">30 يومًا</option>
+      </select>
+    </div>
+    <div class="field full">
+      <label>رسالة للزائر (اختياري)</label>
+      <textarea id="fpsNote" placeholder="مثال: نأمل الاطلاع على ملف الإنجاز وإبداء الرأي."></textarea>
+    </div>
+  </div>
+  <div class="modal-actions">
+    <button class="action" type="button" onclick="createFullPortfolioShare()">إنشاء رابط وباركود</button>
+  </div>
+  <div id="fpsStatus"></div>
+  <div id="fpsShareBox" class="survey-share-box hidden">
+    <div id="fpsUrl" class="survey-share-url"></div>
+    <div id="fpsQr" class="survey-share-qr"></div>
+    <div class="modal-actions">
+      <button class="action secondary" type="button" onclick="copyFullPortfolioShare()">نسخ الرابط</button>
+      <button class="action secondary" type="button" onclick="sendFullPortfolioShare()">إرسال</button>
+    </div>
+  </div>
+</div></div>
+
+<!-- عرض ملف الإنجاز كاملًا للزائر - قراءة فقط -->
+<section id="fullPortfolioPublicPage" class="survey-public-page">
+  <div class="survey-public-shell full-portfolio-public-shell">
+    <div class="survey-public-brand">👁️ ملف الإنجاز المهني — للاطلاع فقط</div>
+    <h1 id="fppTitle">ملف الإنجاز المهني</h1>
+    <div id="fppNote" class="survey-public-desc"></div>
+    <div id="fppMeta" class="viewer-note"></div>
+    <div id="fppClosed" class="survey-alert hidden">هذا الرابط غير صالح أو انتهت مدته.</div>
+
+    <div id="fppContent">
+      <div id="fppSections" class="full-portfolio-sections"></div>
+
+      <div id="fppFeedbackBox" class="section-block" style="margin-top:16px">
+        <h3>💬 الرأي / الملاحظة</h3>
+        <div class="form-grid">
+          <div class="field"><label>الاسم (اختياري)</label><input id="fppName" placeholder="الاسم"></div>
+          <div class="field full"><label>الرأي أو التوصية</label><textarea id="fppFeedback" placeholder="اكتبي الرأي أو الملاحظة أو التوصية"></textarea></div>
+          <div id="fppAdminFields" class="field full hidden">
+            <label>حالة المراجعة</label>
+            <select id="fppStatus">
+              <option value="approved">معتمد</option>
+              <option value="needs_changes">يحتاج تعديل</option>
+              <option value="reviewed">تم الاطلاع</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="action" type="button" onclick="submitFullPortfolioFeedback()">إرسال الرأي</button>
+        </div>
+        <div id="fppMessage"></div>
+      </div>
+    </div>
+  </div>
+</section>
 </body>
 </html>
