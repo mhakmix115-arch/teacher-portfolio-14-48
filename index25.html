@@ -101,6 +101,7 @@ body.cover-open{overflow:hidden}
 .specials{width:min(94%,920px);margin:0 auto 38px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .special-card{background:linear-gradient(145deg,#fffdf8,#f7eddc);border:1px solid var(--line);border-radius:18px;padding:14px;min-height:82px;text-align:right;color:var(--green);box-shadow:0 5px 16px rgba(95,69,23,.07)}
 .special-card b{display:block;font-size:14px}.special-card span{font-size:11px;color:var(--muted);display:block;margin-top:5px}
+.special-card-wide{grid-column:1 / -1;min-height:92px;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center}.special-card-wide b{font-size:17px}.special-card-wide span{font-size:12px}
 
 /* صفحات الأقسام */
 .panel{display:none;position:fixed;inset:0;z-index:60;background:radial-gradient(circle at top,#fffaf2 0,#f8f1e5 55%);overflow:auto;padding:max(74px,calc(env(safe-area-inset-top) + 64px)) 14px 34px}
@@ -589,8 +590,8 @@ body.cover-open{overflow:hidden}
     <button class="special-card manage-only" onclick="openSurveys()"><b>📊 الاستبيانات والنتائج</b><span>إنشاء • نشر • رابط وباركود • نتائج ورسوم بيانية</span></button>
     <button class="special-card manage-only" onclick="cloudInfo()"><b>☁️ السحابة والحسابات</b><span>Supabase + Microsoft • مزامنة وصلاحيات بين الأجهزة</span></button>
     <button class="special-card teacher-only manage-only" type="button" onclick="unifiedShareOpen()"><b>🔗 المشاركة بالباركود</b><span>الإدارة والأسرة • روابط خاصة • اعتماد وملاحظات</span></button>
-    <button class="special-card teacher-only manage-only" type="button" onclick="openQuickInbox()"><b>📥 الوارد السريع</b><span>ملفات وصور مؤقتة • ثم نقلها للقسم أو المجلد المناسب</span></button>
     <button class="special-card teacher-only manage-only" type="button" onclick="fullPortfolioShareOpen()"><b>👁️ مشاركة ملف الإنجاز كامل للاطلاع</b><span>كل الأقسام والملفات • عرض فقط • رأي واعتماد بدون تعديل</span></button>
+    <button class="special-card special-card-wide teacher-only manage-only" type="button" onclick="openQuickInbox()"><b>📥 الوارد السريع</b><span>ملفات وصور مؤقتة • ثم نقلها للقسم أو المجلد المناسب</span></button>
   </div>
 </section>
 
