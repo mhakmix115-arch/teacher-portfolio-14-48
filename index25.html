@@ -964,6 +964,149 @@ const SUPABASE_PUBLISHABLE_KEY='sb_publishable_E9uCMJvYUiY-YZZJCeV12w_oNhomoqk';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
   auth:{persistSession:true,detectSessionInUrl:true,autoRefreshToken:true}
 });
+/* ===== ثبات ملف الإنجاز بين الخروج والدخول والأجهزة ===== */
+const PORTFOLIO_MASTER_SECTION='__PORTFOLIO_MASTER_STATE__';
+let cloudStateApplying=false;
+let cloudStateTimer=null;
+let cloudStateRowId=null;
+
+function portfolioLocalSnapshot(){
+  const storage={};
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(k && k.startsWith(NS) && k!==NS+'cloud_saved_at'){
+      storage[k]=localStorage.getItem(k);
+    }
+  }
+  return {version:1,saved_at:new Date().toISOString(),storage};
+}
+
+function portfolioSnapshotHasContent(snap){
+  if(!snap?.storage)return false;
+  return Object.values(snap.storage).some(v=>v && v!=='[]' && v!=='{}' && v!=='""');
+}
+
+function applyPortfolioCloudSnapshot(snap){
+  if(!snap?.storage)return;
+  cloudStateApplying=true;
+  try{
+    for(const [k,v] of Object.entries(snap.storage)){
+      if(k.startsWith(NS)) localStorage.setItem(k,v);
+    }
+    localStorage.setItem(NS+'cloud_saved_at',snap.saved_at||new Date().toISOString());
+  }finally{
+    cloudStateApplying=false;
+  }
+  try{
+    renderCards();
+    renderSideNav();
+    if(currentSection && document.getElementById('panel')?.classList.contains('active')){
+      const ed=document.getElementById('editor');
+      if(ed) ed.value=localStorage.getItem(NS+'text_'+currentSection)||'';
+      renderFolders();
+      renderRootFiles();
+      if(currentFolderId) refreshFolderView();
+    }
+  }catch(e){console.warn(e)}
+}
+
+async function ensurePortfolioCloudState(){
+  if(sharedPortfolioToken)return;
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session)return;
+
+    const {data:rows,error}=await sb.from('share_links')
+      .select('id,snapshot,created_at')
+      .eq('owner_id',session.user.id)
+      .eq('section_key',PORTFOLIO_MASTER_SECTION)
+      .order('created_at',{ascending:false})
+      .limit(1);
+    if(error)throw error;
+
+    const row=rows?.[0]||null;
+    const localSnap=portfolioLocalSnapshot();
+    const localStamp=localStorage.getItem(NS+'cloud_saved_at');
+    const cloudSnap=row?.snapshot||null;
+
+    if(row){
+      cloudStateRowId=row.id;
+      const cloudStamp=cloudSnap?.saved_at||row.created_at;
+      const shouldRestore=
+        portfolioSnapshotHasContent(cloudSnap) &&
+        (!localStamp || !portfolioSnapshotHasContent(localSnap) ||
+        new Date(cloudStamp).getTime()>new Date(localStamp).getTime());
+
+      if(shouldRestore) applyPortfolioCloudSnapshot(cloudSnap);
+      else await savePortfolioCloudState(true);
+    }else{
+      const token='master_'+session.user.id.replace(/-/g,'')+'_'+Date.now();
+      const {data:newRow,error:insErr}=await sb.from('share_links').insert({
+        owner_id:session.user.id,
+        token,
+        access_role:'family',
+        section_key:PORTFOLIO_MASTER_SECTION,
+        title:'حالة ملف الإنجاز الرئيسية',
+        snapshot:localSnap,
+        expires_at:'2099-12-31T23:59:59Z',
+        revoked:false
+      }).select('id').single();
+      if(insErr)throw insErr;
+      cloudStateRowId=newRow.id;
+      localStorage.setItem(NS+'cloud_saved_at',localSnap.saved_at);
+    }
+  }catch(e){console.warn('PORTFOLIO_CLOUD_LOAD',e)}
+}
+
+async function savePortfolioCloudState(force=false){
+  if(cloudStateApplying || sharedPortfolioToken)return;
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session)return;
+    if(!cloudStateRowId){
+      if(!force){await ensurePortfolioCloudState();return}
+    }
+    if(!cloudStateRowId)return;
+    const snap=portfolioLocalSnapshot();
+    const {error}=await sb.from('share_links')
+      .update({snapshot:snap})
+      .eq('id',cloudStateRowId)
+      .eq('owner_id',session.user.id);
+    if(error)throw error;
+    cloudStateApplying=true;
+    localStorage.setItem(NS+'cloud_saved_at',snap.saved_at);
+    cloudStateApplying=false;
+  }catch(e){console.warn('PORTFOLIO_CLOUD_SAVE',e)}
+}
+
+function schedulePortfolioCloudSave(){
+  if(cloudStateApplying || sharedPortfolioToken)return;
+  clearTimeout(cloudStateTimer);
+  cloudStateTimer=setTimeout(()=>savePortfolioCloudState(false),700);
+}
+
+const _portfolioLSSet=Storage.prototype.setItem;
+const _portfolioLSRemove=Storage.prototype.removeItem;
+Storage.prototype.setItem=function(k,v){
+  _portfolioLSSet.call(this,k,v);
+  if(this===localStorage && typeof k==='string' && k.startsWith(NS) && k!==NS+'cloud_saved_at'){
+    schedulePortfolioCloudSave();
+  }
+};
+Storage.prototype.removeItem=function(k){
+  _portfolioLSRemove.call(this,k);
+  if(this===localStorage && typeof k==='string' && k.startsWith(NS) && k!==NS+'cloud_saved_at'){
+    schedulePortfolioCloudSave();
+  }
+};
+
+window.addEventListener('DOMContentLoaded',()=>setTimeout(ensurePortfolioCloudState,500));
+sb.auth.onAuthStateChange((event,session)=>{
+  if(session && ['SIGNED_IN','INITIAL_SESSION','TOKEN_REFRESHED'].includes(event)){
+    setTimeout(ensurePortfolioCloudState,350);
+  }
+});
+
 
 async function signInWithMicrosoft(){
   if(sharedPortfolioToken){
@@ -1042,7 +1185,7 @@ function openPanel(title,desc){
   $('panel').classList.add('active');
 }
 function closePanel(){$('panel').classList.remove('active');currentFolderId=null}
-function saveText(){localStorage.setItem(NS+'text_'+currentSection,$('editor').value);toast('تم حفظ محتوى القسم')}
+function saveText(){localStorage.setItem(NS+'text_'+currentSection,$('editor').value);schedulePortfolioCloudSave();toast('تم حفظ محتوى القسم')}
 
 function migrateSection(section){
   const newFk=NS+'folders_'+section;
@@ -1128,7 +1271,7 @@ function refreshFolderView(){
   $('folderNote').value=localStorage.getItem(NS+folderNoteKey(currentSection,f.id))||'';
   renderFolderFiles();applyRole();
 }
-function saveFolderNote(){if(!currentFolderId)return;localStorage.setItem(NS+folderNoteKey(currentSection,currentFolderId),$('folderNote').value);touchFolder(currentFolderId);toast('تم حفظ محتوى المجلد')}
+function saveFolderNote(){if(!currentFolderId)return;localStorage.setItem(NS+folderNoteKey(currentSection,currentFolderId),$('folderNote').value);touchFolder(currentFolderId);schedulePortfolioCloudSave();toast('تم حفظ محتوى المجلد')}
 function touchFolder(id,section=currentSection){const a=getFolders(section),i=a.findIndex(f=>String(f.id)===String(id));if(i>=0){a[i].updatedAt=now();saveFolders(a,section)}}
 
 /* الملفات — تخزين كبير عبر IndexedDB */
@@ -1147,6 +1290,30 @@ function openFileDb(){
 async function idbPutFile(id,blob){const db=await openFileDb();return new Promise((resolve,reject)=>{const tx=db.transaction(FILE_DB_STORE,'readwrite');tx.objectStore(FILE_DB_STORE).put(blob,id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
 async function idbGetFile(id){const db=await openFileDb();return new Promise((resolve,reject)=>{const tx=db.transaction(FILE_DB_STORE,'readonly'),r=tx.objectStore(FILE_DB_STORE).get(id);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}
 async function idbDeleteFile(id){try{const db=await openFileDb();return await new Promise((resolve,reject)=>{const tx=db.transaction(FILE_DB_STORE,'readwrite');tx.objectStore(FILE_DB_STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}catch(e){}}
+
+async function uploadPortfolioBlobToCloud(id,name,type,blob){
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session)return null;
+    const path=`${session.user.id}/portfolio/${id}_${usSafeName(name||'file')}`;
+    const {error}=await sb.storage.from('shared-artifacts').upload(path,blob,{
+      contentType:type||blob.type||'application/octet-stream',
+      upsert:true
+    });
+    if(error)throw error;
+    return path;
+  }catch(e){console.warn('PORTFOLIO_FILE_CLOUD_UPLOAD',e);return null}
+}
+
+async function signedPortfolioCloudUrl(path,seconds=3600){
+  if(!path)return null;
+  try{
+    const {data,error}=await sb.storage.from('shared-artifacts').createSignedUrl(path,seconds);
+    if(error)throw error;
+    return data?.signedUrl||null;
+  }catch(e){console.warn(e);return null}
+}
+
 async function requestPersistentStorage(){try{if(navigator.storage?.persist)await navigator.storage.persist()}catch(e){}}
 requestPersistentStorage();
 
@@ -1174,7 +1341,8 @@ async function addFilesToStorage(input,ctx){
       /* تحويل File إلى Blob يحسن التوافق مع IndexedDB في Safari/iPhone */
       const blob=f.slice(0,f.size,f.type||'application/octet-stream');
       await idbPutFile(id,blob);
-      metas.push({id,name:f.name,type:f.type||'application/octet-stream',size:f.size||0,storage:'idb',createdAt:now(),updatedAt:now()});
+      const cloudPath=await uploadPortfolioBlobToCloud(id,f.name,f.type||'application/octet-stream',blob);
+      metas.push({id,name:f.name,type:f.type||'application/octet-stream',size:f.size||0,storage:'idb',cloud_path:cloudPath||null,createdAt:now(),updatedAt:now()});
       done++;
       setUploadStatus(`جاري الحفظ: ${done} من ${incoming.length} — ${f.name}`);
     }catch(err){
@@ -1231,6 +1399,14 @@ async function openFile(file){
     const w=window.open(file.cloud_url,'_blank','noopener');
     if(!w) location.href=file.cloud_url;
     return;
+  }
+  if(file.cloud_path){
+    const url=await signedPortfolioCloudUrl(file.cloud_path,3600);
+    if(url){
+      const w=window.open(url,'_blank','noopener');
+      if(!w) location.href=url;
+      return;
+    }
   }
   if(file.data){const w=window.open();if(w){if((file.type||'').startsWith('image/'))w.document.write(`<img src="${file.data}" style="max-width:100%;height:auto">`);else if((file.type||'').startsWith('video/'))w.document.write(`<video src="${file.data}" controls autoplay style="max-width:100%"></video>`);else w.location=file.data}return}
   const blob=await idbGetFile(file.id);if(!blob){toast('تعذر العثور على الملف على هذا الجهاز');return}const url=URL.createObjectURL(blob);const w=window.open(url,'_blank');if(!w){const a=document.createElement('a');a.href=url;a.download=file.name;a.click()}setTimeout(()=>URL.revokeObjectURL(url),60000)
@@ -1913,7 +2089,18 @@ function openShareBuilder(){
 
 async function blobForPortfolioFile(file){
   try{
-    if(file.storage==='idb') return await idbGetFile(file.id);
+    if(file.storage==='idb'){
+      const local=await idbGetFile(file.id);
+      if(local)return local;
+    }
+    if(file.cloud_path){
+      const {data,error}=await sb.storage.from('shared-artifacts').download(file.cloud_path);
+      if(!error && data)return data;
+    }
+    if(file.cloud_url){
+      const r=await fetch(file.cloud_url);
+      return await r.blob();
+    }
     if(file.data){
       const r=await fetch(file.data);
       return await r.blob();
@@ -2687,6 +2874,160 @@ async function submitFullPortfolioFeedback(){
 
 window.addEventListener('DOMContentLoaded',()=>setTimeout(loadFullPortfolioPublic,120));
 
+
+let familyWallUrl='';
+let familyWallPublic=null;
+
+function familyWallKey(section=currentSection,folder=currentFolderId){return `familyWall_${section}_${folder}`}
+
+function openFamilyWallShare(){
+  if(!currentFolderId){toast('افتحي المجلد المطلوب أولًا');return}
+  document.getElementById('fwStatus').innerHTML='';
+  document.getElementById('fwShareBox').classList.add('hidden');
+  openModal('familyWallShareModal');
+}
+
+async function createFamilyWallShare(){
+  const status=document.getElementById('fwStatus');
+  status.innerHTML='<div class="us-ok">⏳ جاري إنشاء الرابط…</div>';
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session)throw new Error('يلزم تسجيل دخول المعلمة.');
+    const folder=getFolder(currentFolderId,currentSection);
+    const days=Number(document.getElementById('fwDays').value||30);
+    const note=document.getElementById('fwNote').value.trim();
+    const {data,error}=await sb.rpc('create_share_link',{
+      p_role:'family',
+      p_section:currentSection,
+      p_title:folder?.name||'مشاركة صور الأسرة',
+      p_snapshot:{type:'family_photo_wall',section:currentSection,folder_id:String(currentFolderId),folder_name:folder?.name||'مجلد',note},
+      p_days:days
+    });
+    if(error)throw error;
+    setJSON(familyWallKey(),{share_id:data.id,token:data.token,folder_name:folder?.name||'مجلد'});
+    familyWallUrl=`${location.origin}${location.pathname}?family_wall=${encodeURIComponent(data.token)}`;
+    document.getElementById('fwUrl').textContent=familyWallUrl;
+    document.getElementById('fwShareBox').classList.remove('hidden');
+    const qr=document.getElementById('fwQr');qr.innerHTML='';
+    if(window.QRCode)new QRCode(qr,{text:familyWallUrl,width:180,height:180,correctLevel:QRCode.CorrectLevel.M});
+    status.innerHTML='<div class="us-ok">✅ الرابط جاهز للإرسال للأسر.</div>';
+  }catch(e){status.innerHTML='<div class="us-err">'+esc(e.message||'تعذر إنشاء الرابط')+'</div>'}
+}
+
+async function copyFamilyWall(){
+  if(familyWallUrl){await navigator.clipboard.writeText(familyWallUrl);toast('تم نسخ الرابط')}
+}
+async function sendFamilyWall(){
+  if(!familyWallUrl)return;
+  if(navigator.share){
+    try{await navigator.share({title:'حائط صور الأسر',url:familyWallUrl});return}catch(e){}
+  }
+  await copyFamilyWall();
+}
+
+async function compressFamilyPhoto(file){
+  return await new Promise((resolve,reject)=>{
+    const img=new Image(),url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const max=1280,scale=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement('canvas');
+      c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg',0.72));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('تعذر قراءة الصورة'))};
+    img.src=url;
+  });
+}
+
+async function loadFamilyWallPublic(){
+  const token=new URLSearchParams(location.search).get('family_wall');
+  if(!token)return;
+  try{
+    document.getElementById('cover').style.display='none';
+    document.getElementById('portfolio').style.display='none';
+    document.getElementById('familyWallPublicPage').classList.add('active');
+    const {data,error}=await sb.rpc('resolve_share_link_v2',{p_token:token});
+    if(error)throw error;
+    if(!data?.valid || data.snapshot?.type!=='family_photo_wall')throw new Error('closed');
+    familyWallPublic={...data,token};
+    document.getElementById('fwpTitle').textContent='إضافة صور إلى: '+(data.snapshot?.folder_name||data.title||'المجلد');
+    document.getElementById('fwpNote').textContent=data.snapshot?.note||'اختاري الصور ثم اضغطي إرسال.';
+  }catch(e){
+    document.getElementById('familyWallPublicPage').classList.add('active');
+    document.getElementById('fwpClosed').classList.remove('hidden');
+    document.getElementById('fwpForm').classList.add('hidden');
+  }
+}
+
+async function submitFamilyWallPhotos(){
+  const status=document.getElementById('fwpStatus');
+  try{
+    const files=[...(document.getElementById('fwpFiles').files||[])];
+    if(!files.length)throw new Error('اختاري صورة واحدة على الأقل.');
+    if(files.length>8)throw new Error('الحد الأقصى 8 صور في المرة الواحدة.');
+    const name=document.getElementById('fwpName').value.trim()||null;
+    const caption=document.getElementById('fwpCaption').value.trim();
+    for(let i=0;i<files.length;i++){
+      status.innerHTML=`<div class="us-ok">⏳ تجهيز الصورة ${i+1} من ${files.length}…</div>`;
+      const dataUrl=await compressFamilyPhoto(files[i]);
+      const {error}=await sb.rpc('submit_share_response',{
+        p_token:familyWallPublic.token,
+        p_type:'recommendation',
+        p_name:name,
+        p_status:null,
+        p_note:caption||files[i].name,
+        p_signature:null,
+        p_stamp:dataUrl
+      });
+      if(error)throw error;
+    }
+    status.innerHTML='<div class="us-ok">✅ تم إرسال الصور بنجاح.</div>';
+    document.getElementById('fwpFiles').value='';
+  }catch(e){status.innerHTML='<div class="us-err">'+esc(e.message||'تعذر إرسال الصور')+'</div>'}
+}
+
+async function openFamilyWallResponses(){
+  const saved=getJSON(familyWallKey(),null);
+  const box=document.getElementById('fwResponsesList');
+  if(!saved?.share_id){
+    box.innerHTML='<div class="empty-state">أنشئي رابط حائط الصور لهذا المجلد أولًا.</div>';
+    openModal('familyWallResponsesModal');
+    return;
+  }
+  box.innerHTML='<div class="empty-state">جاري التحميل…</div>';
+  openModal('familyWallResponsesModal');
+  try{
+    const {data,error}=await sb.from('share_responses').select('*').eq('share_id',saved.share_id).order('created_at',{ascending:false});
+    if(error)throw error;
+    const photos=(data||[]).filter(r=>r.stamp_data);
+    if(!photos.length){box.innerHTML='<div class="empty-state">لم تصل صور من الأسر بعد.</div>';return}
+    window._familyWallPhotos=photos;
+    box.innerHTML=photos.map((r,i)=>`<div class="survey-list-card"><b>${esc(r.responder_name||'أسرة')}</b><div class="viewer-note">${new Date(r.created_at).toLocaleString('ar-SA')}</div>${r.note?`<div style="margin:7px 0">${esc(r.note)}</div>`:''}<img src="${r.stamp_data}" style="width:100%;max-height:360px;object-fit:contain;border-radius:14px;background:#fff"><div class="modal-actions"><button class="action secondary" onclick="saveFamilyPhotoToFolder(${i})">＋ حفظ داخل المجلد</button></div></div>`).join('');
+  }catch(e){box.innerHTML='<div class="survey-alert">تعذر تحميل الصور.</div>'}
+}
+
+async function saveFamilyPhotoToFolder(i){
+  try{
+    const r=(window._familyWallPhotos||[])[i];
+    if(!r?.stamp_data)return;
+    const blob=await (await fetch(r.stamp_data)).blob();
+    const id='f_'+now()+'_'+Math.random().toString(36).slice(2,9);
+    await idbPutFile(id,blob);
+    const name='صورة الأسرة_'+new Date(r.created_at).toLocaleDateString('ar-SA')+'.jpg';
+    const cloudPath=await uploadPortfolioBlobToCloud(id,name,'image/jpeg',blob);
+    const meta={id,name,type:'image/jpeg',size:blob.size,storage:'idb',cloud_path:cloudPath||null,createdAt:now(),updatedAt:now()};
+    const a=getFolderFiles(currentFolderId,currentSection);
+    a.unshift(meta);
+    saveFolderFiles(a,currentFolderId,currentSection);
+    toast('تم حفظ الصورة داخل المجلد');
+    refreshFolderView();
+  }catch(e){toast('تعذر حفظ الصورة')}
+}
+
+window.addEventListener('DOMContentLoaded',()=>setTimeout(loadFamilyWallPublic,100));
+
 async function unifiedCopyShare(){
   if(!usShareUrl)return;
   await navigator.clipboard.writeText(usShareUrl);
@@ -2882,6 +3223,44 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
       </div>
     </div>
   </div>
+</section>
+
+<div class="modal" id="familyWallShareModal"><div class="modal-card">
+  <div class="modal-head"><h3>👨‍👩‍👧 حائط صور الأسر</h3><button class="back" onclick="closeModal('familyWallShareModal')">إغلاق</button></div>
+  <div class="viewer-note">رابط واحد ترسلينه في مجموعة الأسر. الأسرة تضيف صور فقط إلى هذا المجلد، بدون تعديل ملف الإنجاز.</div>
+  <div class="form-grid" style="margin-top:10px">
+    <div class="field"><label>مدة الرابط</label><select id="fwDays"><option value="7">7 أيام</option><option value="14">14 يومًا</option><option value="30" selected>30 يومًا</option></select></div>
+    <div class="field full"><label>رسالة للأسر</label><textarea id="fwNote" placeholder="مثال: نأمل إضافة صور مشاركة الطفل في النشاط."></textarea></div>
+  </div>
+  <div class="modal-actions"><button class="action" onclick="createFamilyWallShare()">إنشاء رابط الصور</button></div>
+  <div id="fwStatus"></div>
+  <div id="fwShareBox" class="survey-share-box hidden">
+    <div id="fwUrl" class="survey-share-url"></div><div id="fwQr" class="survey-share-qr"></div>
+    <div class="modal-actions"><button class="action secondary" onclick="copyFamilyWall()">نسخ الرابط</button><button class="action secondary" onclick="sendFamilyWall()">إرسال</button></div>
+  </div>
+</div></div>
+
+<div class="modal" id="familyWallResponsesModal"><div class="modal-card survey-pro-card">
+  <div class="modal-head"><h3>📥 صور الأسر المرسلة</h3><button class="back" onclick="closeModal('familyWallResponsesModal')">إغلاق</button></div>
+  <div id="fwResponsesList"></div>
+</div></div>
+
+<section id="familyWallPublicPage" class="survey-public-page">
+ <div class="survey-public-shell">
+  <div class="survey-public-brand">👨‍👩‍👧 مشاركة الأسرة</div>
+  <h1 id="fwpTitle">إضافة صور</h1>
+  <div id="fwpNote" class="survey-public-desc"></div>
+  <div id="fwpClosed" class="survey-alert hidden">هذا الرابط غير متاح.</div>
+  <div id="fwpForm">
+    <div class="section-block">
+      <div class="field"><label>اسم ولي الأمر (اختياري)</label><input id="fwpName" placeholder="الاسم"></div>
+      <div class="field" style="margin-top:10px"><label>اختيار الصور</label><input id="fwpFiles" type="file" accept="image/*" multiple></div>
+      <div class="field" style="margin-top:10px"><label>ملاحظة قصيرة (اختياري)</label><input id="fwpCaption" placeholder="مثال: مشاركة الطفل في النشاط"></div>
+    </div>
+    <div class="modal-actions"><button class="action" onclick="submitFamilyWallPhotos()">📤 إرسال الصور</button></div>
+    <div id="fwpStatus"></div>
+  </div>
+ </div>
 </section>
 </body>
 </html>
