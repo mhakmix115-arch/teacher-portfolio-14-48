@@ -513,6 +513,13 @@ body.cover-open{overflow:hidden}
 .full-portfolio-file a{text-decoration:none}
 .full-portfolio-empty{color:#8a8175;font-size:12px;padding:6px 0}
 
+
+/* ===== الوارد السريع ===== */
+.quick-inbox-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px}
+.quick-inbox-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.quick-inbox-meta{font-size:11px;color:#7b746a;margin-top:4px}
+.quick-inbox-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+
 </style>
 </head>
 <body class="cover-open">
@@ -582,6 +589,7 @@ body.cover-open{overflow:hidden}
     <button class="special-card manage-only" onclick="openSurveys()"><b>📊 الاستبيانات والنتائج</b><span>إنشاء • نشر • رابط وباركود • نتائج ورسوم بيانية</span></button>
     <button class="special-card manage-only" onclick="cloudInfo()"><b>☁️ السحابة والحسابات</b><span>Supabase + Microsoft • مزامنة وصلاحيات بين الأجهزة</span></button>
     <button class="special-card teacher-only manage-only" type="button" onclick="unifiedShareOpen()"><b>🔗 المشاركة بالباركود</b><span>الإدارة والأسرة • روابط خاصة • اعتماد وملاحظات</span></button>
+    <button class="special-card teacher-only manage-only" type="button" onclick="openQuickInbox()"><b>📥 الوارد السريع</b><span>ملفات وصور مؤقتة • ثم نقلها للقسم أو المجلد المناسب</span></button>
     <button class="special-card teacher-only manage-only" type="button" onclick="fullPortfolioShareOpen()"><b>👁️ مشاركة ملف الإنجاز كامل للاطلاع</b><span>كل الأقسام والملفات • عرض فقط • رأي واعتماد بدون تعديل</span></button>
   </div>
 </section>
@@ -3030,6 +3038,154 @@ async function saveFamilyPhotoToFolder(i){
 
 window.addEventListener('DOMContentLoaded',()=>setTimeout(loadFamilyWallPublic,100));
 
+
+/* ===== الوارد السريع ===== */
+let quickInboxMoveIndex=null;
+
+function quickInboxKey(){ return 'quickInboxFiles'; }
+function getQuickInbox(){ return getJSON(quickInboxKey(),[]); }
+function saveQuickInbox(list){
+  setJSON(quickInboxKey(),list);
+  if(typeof schedulePortfolioCloudSave==='function') schedulePortfolioCloudSave();
+}
+
+function openQuickInbox(){
+  renderQuickInbox();
+  openModal('quickInboxModal');
+}
+
+async function quickInboxAddFiles(){
+  const input=document.getElementById('quickInboxInput');
+  const status=document.getElementById('quickInboxStatus');
+  const files=[...(input.files||[])];
+  if(!files.length){status.innerHTML='<div class="us-err">اختاري ملفًا أو صورة أولًا.</div>';return}
+  status.innerHTML='<div class="us-ok">⏳ جاري الإضافة للوارد…</div>';
+
+  const list=getQuickInbox();
+  let added=0,failed=0;
+  for(const f of files){
+    try{
+      const id='qi_'+Date.now()+'_'+Math.random().toString(36).slice(2,9);
+      await idbPutFile(id,f);
+      let cloudPath=null;
+      if(typeof uploadPortfolioBlobToCloud==='function'){
+        cloudPath=await uploadPortfolioBlobToCloud(id,f.name,f.type||'application/octet-stream',f);
+      }
+      list.unshift({
+        id,
+        name:f.name||'ملف',
+        type:f.type||'application/octet-stream',
+        size:f.size||0,
+        storage:'idb',
+        cloud_path:cloudPath||null,
+        createdAt:Date.now(),
+        updatedAt:Date.now()
+      });
+      added++;
+    }catch(e){console.error(e);failed++}
+  }
+  saveQuickInbox(list);
+  input.value='';
+  status.innerHTML=`<div class="us-ok">✅ تمت إضافة ${added} ملف للوارد${failed?`، وتعذر ${failed}`:''}.</div>`;
+  renderQuickInbox();
+}
+
+function renderQuickInbox(){
+  const box=document.getElementById('quickInboxList');
+  if(!box)return;
+  let list=[...getQuickInbox()];
+  const q=(document.getElementById('quickInboxSearch')?.value||'').trim().toLowerCase();
+  const sort=document.getElementById('quickInboxSort')?.value||'newest';
+
+  if(q) list=list.filter(f=>(f.name||'').toLowerCase().includes(q));
+  if(sort==='oldest') list.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  else if(sort==='name') list.sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));
+  else list.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+
+  if(!list.length){
+    box.innerHTML='<div class="empty-state">الوارد فارغ.</div>';
+    return;
+  }
+
+  box.innerHTML=list.map((f,i)=>`
+    <div class="quick-inbox-card">
+      <div class="quick-inbox-row">
+        <div>
+          <b>${esc(f.name||'ملف')}</b>
+          <div class="quick-inbox-meta">${formatBytes(f.size||0)} • ${new Date(f.createdAt||Date.now()).toLocaleString('ar-SA')}</div>
+        </div>
+        <div class="quick-inbox-actions">
+          <button class="action secondary" type="button" onclick="quickInboxOpenById('${f.id}')">👁️ فتح</button>
+          <button class="action" type="button" onclick="quickInboxChooseMove('${f.id}')">📂 نقل</button>
+          <button class="action danger" type="button" onclick="quickInboxDelete('${f.id}')">حذف</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function quickInboxOpenById(id){
+  const f=getQuickInbox().find(x=>x.id===id);
+  if(!f)return;
+  await openFile(f);
+}
+
+function quickInboxChooseMove(id){
+  quickInboxMoveIndex=id;
+  const sec=document.getElementById('quickInboxSection');
+  const sections=(typeof items!=='undefined'?items:[]);
+  sec.innerHTML=sections.map(i=>`<option value="${i[1]}">${esc(sectionDisplayName(i[1]))}</option>`).join('');
+  if(currentSection) sec.value=currentSection;
+  quickInboxRenderFolders();
+  openModal('quickInboxMoveModal');
+}
+
+function quickInboxRenderFolders(){
+  const secKey=document.getElementById('quickInboxSection').value;
+  const sel=document.getElementById('quickInboxFolder');
+  const folders=getFolders(secKey)||[];
+  sel.innerHTML='<option value="__ROOT__">داخل القسم مباشرة</option>'+
+    folders.map(f=>`<option value="${f.id}">📁 ${esc(f.name||'مجلد')}</option>`).join('');
+}
+
+function quickInboxConfirmMove(){
+  const id=quickInboxMoveIndex;
+  if(!id)return;
+  const list=getQuickInbox();
+  const i=list.findIndex(x=>x.id===id);
+  if(i<0)return;
+  const file=list[i];
+
+  const secKey=document.getElementById('quickInboxSection').value;
+  const folderId=document.getElementById('quickInboxFolder').value;
+
+  if(folderId==='__ROOT__'){
+    const files=getRootFiles(secKey);
+    files.unshift(file);
+    saveRootFiles(files,secKey);
+  }else{
+    const files=getFolderFiles(folderId,secKey);
+    files.unshift(file);
+    saveFolderFiles(files,folderId,secKey);
+  }
+
+  list.splice(i,1);
+  saveQuickInbox(list);
+  closeModal('quickInboxMoveModal');
+  renderQuickInbox();
+  toast('تم نقل الملف من الوارد');
+}
+
+async function quickInboxDelete(id){
+  if(!confirm('حذف هذا الملف من الوارد؟'))return;
+  const list=getQuickInbox();
+  const i=list.findIndex(x=>x.id===id);
+  if(i<0)return;
+  try{ await idbDeleteFile(list[i].id); }catch(e){}
+  list.splice(i,1);
+  saveQuickInbox(list);
+  renderQuickInbox();
+}
+
 async function unifiedCopyShare(){
   if(!usShareUrl)return;
   await navigator.clipboard.writeText(usShareUrl);
@@ -3264,5 +3420,60 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
   </div>
  </div>
 </section>
+
+<!-- الوارد السريع -->
+<div class="modal" id="quickInboxModal"><div class="modal-card survey-pro-card">
+  <div class="modal-head">
+    <h3>📥 الوارد السريع</h3>
+    <button class="back" type="button" onclick="closeModal('quickInboxModal')">إغلاق</button>
+  </div>
+  <div class="viewer-note">
+    أضيفي هنا أي ملف أو صورة بسرعة، وبعدها انقليه للقسم أو المجلد المناسب بدون إعادة رفعه.
+  </div>
+
+  <div class="section-block" style="margin-top:12px">
+    <div class="form-grid">
+      <div class="field full">
+        <label>إضافة ملفات أو صور للوارد</label>
+        <input id="quickInboxInput" type="file" multiple>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="action" type="button" onclick="quickInboxAddFiles()">＋ إضافة للوارد</button>
+    </div>
+    <div id="quickInboxStatus"></div>
+  </div>
+
+  <div class="survey-toolbar">
+    <input id="quickInboxSearch" type="search" placeholder="بحث في الوارد..." oninput="renderQuickInbox()">
+    <select id="quickInboxSort" onchange="renderQuickInbox()">
+      <option value="newest">الأحدث</option>
+      <option value="oldest">الأقدم</option>
+      <option value="name">الاسم</option>
+    </select>
+  </div>
+
+  <div id="quickInboxList" class="survey-list"></div>
+</div></div>
+
+<div class="modal" id="quickInboxMoveModal"><div class="modal-card">
+  <div class="modal-head">
+    <h3>📂 نقل من الوارد</h3>
+    <button class="back" type="button" onclick="closeModal('quickInboxMoveModal')">إغلاق</button>
+  </div>
+  <div class="form-grid">
+    <div class="field full">
+      <label>القسم</label>
+      <select id="quickInboxSection" onchange="quickInboxRenderFolders()"></select>
+    </div>
+    <div class="field full">
+      <label>المكان داخل القسم</label>
+      <select id="quickInboxFolder"></select>
+    </div>
+  </div>
+  <div class="modal-actions">
+    <button class="action" type="button" onclick="quickInboxConfirmMove()">نقل الآن</button>
+  </div>
+</div></div>
 </body>
 </html>
