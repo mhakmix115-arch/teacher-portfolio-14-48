@@ -1484,7 +1484,7 @@ async function printFile(file){
 <!-- نوافذ المشاركة بالباركود - v23 -->
 <div class="modal" id="shareBuilderModal">
   <div class="modal-card">
-    <h3>🔗 إنشاء رابط وباركود خاص</h3>
+    <h3>🔗 إنشاء رابط مختصر وباركود خاص</h3>
     <div class="form-grid">
       <div class="field">
         <label>نوع الدخول</label>
@@ -1516,7 +1516,7 @@ async function printFile(file){
 
     <div class="modal-actions">
       <button class="action" type="button" onclick="createSecureShare()">إنشاء الرابط والباركود</button>
-      <button class="action secondary hidden" id="copyShareBtn" type="button" onclick="copySecureShare()">نسخ الرابط</button>
+      <button class="action secondary hidden" id="copyShareBtn" type="button" onclick="copySecureShare()">نسخ الرابط المختصر</button>
       <button class="action secondary hidden" id="sendShareBtn" type="button" onclick="sendSecureShare()">إرسال</button>
       <button class="action secondary" type="button" onclick="closeModal('shareBuilderModal')">إغلاق</button>
     </div>
@@ -1884,7 +1884,7 @@ function surveyRenderList(){
   const box=$('svList');
   if(!list.length){box.innerHTML='<div class="empty-state">لا توجد استبيانات بعد.</div>';return}
   box.innerHTML=list.map(s=>{
-    const link=s.token?`${location.origin}${location.pathname}?survey=${encodeURIComponent(s.token)}`:'';
+    const link=s.token?`${location.origin}${location.pathname}?q=${encodeURIComponent(s.token)}`:'';
     return `<div class="survey-list-card">
       <div class="survey-list-head"><div><strong>${esc(s.title)}</strong><div class="viewer-note">${esc(s.section_label||s.section_key||'عام')} • ${s.questions?.length||0} سؤال</div></div><span class="survey-state ${esc(s.status||'draft')}">${surveyStateLabel(s)}</span></div>
       <div class="survey-list-actions">
@@ -1897,15 +1897,15 @@ function surveyRenderList(){
 }
 function surveyShowShare(id){
   const s=surveyCombinedList().find(x=>x.id===id);if(!s?.token)return;
-  const link=`${location.origin}${location.pathname}?survey=${encodeURIComponent(s.token)}`;
+  const link=`${location.origin}${location.pathname}?q=${encodeURIComponent(s.token)}`;
   const box=$('svShare_'+id);box.classList.toggle('hidden');
   if(box.dataset.ready)return;box.dataset.ready='1';
-  box.innerHTML=`<div class="survey-share-url">${esc(link)}</div><div class="survey-share-qr" id="svQr_${id}"></div><div class="survey-list-actions"><button class="action secondary" type="button" onclick="navigator.clipboard.writeText('${link}');toast('تم نسخ الرابط')">نسخ الرابط</button><button class="action secondary" type="button" onclick="surveyNativeShare('${link}','${esc(s.title).replace(/'/g,'&#39;')}')">إرسال</button></div>`;
+  box.innerHTML=`<div class="survey-share-url">${esc(link)}</div><div class="survey-share-qr" id="svQr_${id}"></div><div class="survey-list-actions"><button class="action secondary" type="button" onclick="navigator.clipboard.writeText('${link}');toast('تم نسخ الرابط المختصر')">نسخ الرابط المختصر</button><button class="action secondary" type="button" onclick="surveyNativeShare('${link}','${esc(s.title).replace(/'/g,'&#39;')}')">إرسال</button></div>`;
   if(window.QRCode)new QRCode($('svQr_'+id),{text:link,width:145,height:145,correctLevel:QRCode.CorrectLevel.M});
 }
 async function surveyNativeShare(link,title){
   if(navigator.share){try{await navigator.share({title,url:link});return}catch(e){}}
-  await navigator.clipboard.writeText(link);toast('تم نسخ الرابط');
+  await navigator.clipboard.writeText(link);toast('تم نسخ الرابط المختصر');
 }
 async function surveyToggleClosed(id,status){
   try{
@@ -1949,7 +1949,7 @@ async function surveyRefreshResults(){
 function surveyPrintResults(){window.print()}
 
 async function surveyLoadPublic(){
-  const token=new URLSearchParams(location.search).get('survey');if(!token)return;
+  const token=(new URLSearchParams(location.search).get('q')||new URLSearchParams(location.search).get('survey'));if(!token)return;
   try{
     document.body.classList.remove('cover-open');$('cover')?.style.setProperty('display','none');$('portfolio')?.style.setProperty('display','none');$('panel')?.classList.remove('active');
     $('surveyPublicPage').classList.add('active');
@@ -1996,7 +1996,7 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(surveyLoadPublic,80));
 
 function cloudInfo(){alert('بما أن لديك حساب Microsoft، فهذا يساعدنا في مرحلة الدخول الحقيقي. الربط النهائي سيكون عبر Supabase للحفظ السحابي والصلاحيات، ثم إعداد تسجيل الدخول بواسطة Microsoft / Microsoft Entra إذا كان حسابك المؤسسي يسمح بذلك. هذه النسخة الحالية لا تسجل الدخول إلى Microsoft تلقائيًا بعد؛ تحتاج مرحلة إعداد آمنة تشمل مشروع Supabase وإعداد تطبيق Microsoft وربط عنوان الموقع. بعدها يمكن للمعلمة والإدارة والأسرة الدخول بحسابات منفصلة وتظهر الملفات والاعتمادات والاستبيانات بين الأجهزة.')}
 
-const sharedPortfolioToken = new URLSearchParams(window.location.search).get('portfolio_share');
+const sharedPortfolioToken = (new URLSearchParams(window.location.search).get('p')||new URLSearchParams(window.location.search).get('portfolio_share'));
 let sharedViewRole = 'family';
 const isManageMode = !sharedPortfolioToken && new URLSearchParams(window.location.search).get('public') !== '1';
 
@@ -2182,7 +2182,7 @@ async function createSecureShare(){
       if(!itemErr) uploaded++;
     }
 
-    const url=`https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index25.html?share=${encodeURIComponent(token)}`;
+    const url=`https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index25.html?s=${encodeURIComponent(token)}`;
     currentSecureShareLink=url;
     $('shareQrBox').innerHTML='';
     new QRCode($('shareQrBox'),{text:url,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
@@ -2200,7 +2200,7 @@ async function createSecureShare(){
 async function copySecureShare(){
   if(!currentSecureShareLink) return;
   await navigator.clipboard.writeText(currentSecureShareLink);
-  toast('تم نسخ الرابط');
+  toast('تم نسخ الرابط المختصر');
 }
 async function sendSecureShare(){
   if(!currentSecureShareLink) return;
@@ -2294,7 +2294,7 @@ async function submitGuestRecommendation(){
 }
 
 async function handleShareGuestLink(){
-  const token=new URLSearchParams(location.search).get('share');
+  const token=(new URLSearchParams(location.search).get('s')||new URLSearchParams(location.search).get('share'));
   if(!token) return;
   try{
     document.body.classList.remove('cover-open');
@@ -2346,7 +2346,7 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(handleShareGuestLink,3
       <div id="usQr"><span style="color:#756a5d">سيظهر الباركود هنا</span></div>
       <div id="usUrl" class="us-url hidden"></div>
       <div class="us-actions">
-        <button id="usCopyBtn" class="action secondary hidden" type="button" onclick="unifiedCopyShare()">نسخ الرابط</button>
+        <button id="usCopyBtn" class="action secondary hidden" type="button" onclick="unifiedCopyShare()">نسخ الرابط المختصر</button>
         <button id="usSendBtn" class="action secondary hidden" type="button" onclick="unifiedSendShare()">إرسال الرابط</button>
       </div>
     </div>
@@ -2544,11 +2544,11 @@ async function unifiedCreateShare(){
     const picked=[...(document.getElementById('usFilesInput').files||[])];
     for(const file of picked) await uploadOne(file,'مرفق إضافي');
 
-    usShareUrl='https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index25.html?share='+encodeURIComponent(token);
+    usShareUrl='https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index25.html?s='+encodeURIComponent(token);
     const qr=document.getElementById('usQr');
     qr.innerHTML='';
     if(window.QRCode) new QRCode(qr,{text:usShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
-    else qr.innerHTML='<b>تم إنشاء الرابط. استخدمي زر نسخ الرابط.</b>';
+    else qr.innerHTML='<b>تم إنشاء الرابط. استخدمي زر نسخ الرابط المختصر.</b>';
 
     const urlEl=document.getElementById('usUrl');
     urlEl.textContent=usShareUrl; urlEl.classList.remove('hidden');
@@ -2668,7 +2668,7 @@ async function createFullPortfolioShare(){
     const token=data.token, shareId=data.id;
 
     // أظهر الرابط والباركود فورًا قبل رفع الملفات حتى لا يبدو الزر معطّلًا
-    fullPortfolioShareUrl=`${location.origin}${location.pathname}?portfolio_share=${encodeURIComponent(token)}`;
+    fullPortfolioShareUrl=`${location.origin}${location.pathname}?p=${encodeURIComponent(token)}`;
     document.getElementById('fpsUrl').textContent=fullPortfolioShareUrl;
     document.getElementById('fpsShareBox').classList.remove('hidden');
 
@@ -2721,7 +2721,7 @@ async function createFullPortfolioShare(){
 async function copyFullPortfolioShare(){
   if(!fullPortfolioShareUrl)return;
   await navigator.clipboard.writeText(fullPortfolioShareUrl);
-  toast('تم نسخ الرابط');
+  toast('تم نسخ الرابط المختصر');
 }
 async function sendFullPortfolioShare(){
   if(!fullPortfolioShareUrl)return;
@@ -2874,7 +2874,7 @@ async function loadFullPortfolioPublic(){
 async function submitFullPortfolioFeedback(){
   const msg=document.getElementById('fppMessage');
   try{
-    const token=new URLSearchParams(location.search).get('portfolio_share');
+    const token=(new URLSearchParams(location.search).get('p')||new URLSearchParams(location.search).get('portfolio_share'));
     const role=fullPortfolioPublicData?.snapshot?.viewer_role||fullPortfolioPublicData?.role||'viewer';
     const type=role==='admin'?'approval':'recommendation';
     const status=role==='admin'?(document.getElementById('fppStatus').value||'reviewed'):null;
@@ -2932,7 +2932,7 @@ async function createFamilyWallShare(){
     });
     if(error)throw error;
     setJSON(familyWallKey(),{share_id:data.id,token:data.token,folder_name:folder?.name||'مجلد'});
-    familyWallUrl=`${location.origin}${location.pathname}?family_wall=${encodeURIComponent(data.token)}`;
+    familyWallUrl=`${location.origin}${location.pathname}?w=${encodeURIComponent(data.token)}`;
     document.getElementById('fwUrl').textContent=familyWallUrl;
     document.getElementById('fwShareBox').classList.remove('hidden');
     const qr=document.getElementById('fwQr');qr.innerHTML='';
@@ -2942,7 +2942,7 @@ async function createFamilyWallShare(){
 }
 
 async function copyFamilyWall(){
-  if(familyWallUrl){await navigator.clipboard.writeText(familyWallUrl);toast('تم نسخ الرابط')}
+  if(familyWallUrl){await navigator.clipboard.writeText(familyWallUrl);toast('تم نسخ الرابط المختصر')}
 }
 async function sendFamilyWall(){
   if(!familyWallUrl)return;
@@ -2969,7 +2969,7 @@ async function compressFamilyPhoto(file){
 }
 
 async function loadFamilyWallPublic(){
-  const token=new URLSearchParams(location.search).get('family_wall');
+  const token=(new URLSearchParams(location.search).get('w')||new URLSearchParams(location.search).get('family_wall'));
   if(!token)return;
   try{
     document.getElementById('cover').style.display='none';
@@ -3206,7 +3206,7 @@ async function quickInboxDelete(id){
 async function unifiedCopyShare(){
   if(!usShareUrl)return;
   await navigator.clipboard.writeText(usShareUrl);
-  usStatus('تم نسخ الرابط.');
+  usStatus('تم نسخ الرابط المختصر.');
 }
 async function unifiedSendShare(){
   if(!usShareUrl)return;
@@ -3266,7 +3266,7 @@ async function unifiedSubmitFamily(){
   }catch(e){console.error(e);usGuestStatus(e?.message||'تعذر الإرسال.',true);}
 }
 async function unifiedLoadGuest(){
-  const token=new URLSearchParams(location.search).get('share');
+  const token=(new URLSearchParams(location.search).get('s')||new URLSearchParams(location.search).get('share'));
   if(!token)return;
   try{
     // إظهار صفحة الضيف فوق كل شيء؛ لا يحتاج Microsoft.
@@ -3353,13 +3353,13 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
   </div>
   <div id="fpsStatus" style="margin-top:10px"></div>
   <div class="modal-actions">
-    <button id="fpsCreateBtn" class="action" type="button" onclick="createFullPortfolioShare()">إنشاء رابط وباركود</button>
+    <button id="fpsCreateBtn" class="action" type="button" onclick="createFullPortfolioShare()">إنشاء رابط مختصر وباركود</button>
   </div>
   <div id="fpsShareBox" class="survey-share-box hidden">
     <div id="fpsUrl" class="survey-share-url"></div>
     <div id="fpsQr" class="survey-share-qr"></div>
     <div class="modal-actions">
-      <button class="action secondary" type="button" onclick="copyFullPortfolioShare()">نسخ الرابط</button>
+      <button class="action secondary" type="button" onclick="copyFullPortfolioShare()">نسخ الرابط المختصر</button>
       <button class="action secondary" type="button" onclick="sendFullPortfolioShare()">إرسال</button>
     </div>
   </div>
@@ -3407,11 +3407,11 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
     <div class="field"><label>مدة الرابط</label><select id="fwDays"><option value="7">7 أيام</option><option value="14">14 يومًا</option><option value="30" selected>30 يومًا</option></select></div>
     <div class="field full"><label>رسالة للأسر</label><textarea id="fwNote" placeholder="مثال: نأمل إضافة صور مشاركة الطفل في النشاط."></textarea></div>
   </div>
-  <div class="modal-actions"><button class="action" onclick="createFamilyWallShare()">إنشاء رابط الصور</button></div>
+  <div class="modal-actions"><button class="action" onclick="createFamilyWallShare()">إنشاء رابط صور مختصر</button></div>
   <div id="fwStatus"></div>
   <div id="fwShareBox" class="survey-share-box hidden">
     <div id="fwUrl" class="survey-share-url"></div><div id="fwQr" class="survey-share-qr"></div>
-    <div class="modal-actions"><button class="action secondary" onclick="copyFamilyWall()">نسخ الرابط</button><button class="action secondary" onclick="sendFamilyWall()">إرسال</button></div>
+    <div class="modal-actions"><button class="action secondary" onclick="copyFamilyWall()">نسخ الرابط المختصر</button><button class="action secondary" onclick="sendFamilyWall()">إرسال</button></div>
   </div>
 </div></div>
 
