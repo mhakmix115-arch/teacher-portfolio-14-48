@@ -2588,37 +2588,28 @@ function usSafeName(name){
 }
 
 async function attachPortfolioFileToShare(file,shareId,days,folderName=''){
-  const name=file.name||'ملف';
-  const type=file.type||'application/octet-stream';
-
   try{
-    // إذا الملف له مسار سحابي دائم، أنشئ رابطًا موقّعًا مباشرة.
-    if(file.cloud_path){
-      const {data:signed,error:signedErr}=await sb.storage
-        .from('shared-artifacts')
-        .createSignedUrl(file.cloud_path,days*86400);
-      if(!signedErr && signed?.signedUrl){
-        const {error:itemErr}=await sb.from('share_items').insert({
-          share_id:shareId,
-          file_name:name,
-          mime_type:type,
-          public_url:signed.signedUrl,
-          folder_name:folderName||null
-        });
-        if(!itemErr) return true;
-      }
-    }
-
-    // وإلا استخدم النسخة المحلية ثم ارفعها للمشاركة.
-    const blob=file.storage ? await blobForPortfolioFile(file) : file;
-    if(!blob) return false;
-
     const {data:{session}}=await sb.auth.getSession();
     if(!session) return false;
 
-    const path=`${session.user.id}/shares/${shareId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${usSafeName(name)}`;
+    let blob=null;
+    if(file?.storage==='idb' && file?.id) blob=await idbGetFile(file.id);
+    if(!blob && file?.data){
+      const r=await fetch(file.data);
+      blob=await r.blob();
+    }
+    if(!blob && file?.cloud_path){
+      const {data,error}=await sb.storage.from('shared-artifacts').download(file.cloud_path);
+      if(!error && data) blob=data;
+    }
+    if(!blob) return false;
+
+    const name=file?.name||'ملف';
+    const type=file?.type||blob.type||'application/octet-stream';
+    const path=`${session.user.id}/review/${shareId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${usSafeName(name)}`;
+
     const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,blob,{
-      contentType:type||blob.type||'application/octet-stream',
+      contentType:type,
       upsert:false
     });
     if(upErr) return false;
@@ -2629,7 +2620,7 @@ async function attachPortfolioFileToShare(file,shareId,days,folderName=''){
     const {error:itemErr}=await sb.from('share_items').insert({
       share_id:shareId,
       file_name:name,
-      mime_type:type||blob.type||'application/octet-stream',
+      mime_type:type,
       public_url:signed.signedUrl,
       folder_name:folderName||null
     });
@@ -2751,8 +2742,72 @@ async function fpCollectSnapshot(){
 }
 
 async function fpUploadStoredFile(file, session, token, shareId, days, folderName, sectionLabel){
-  const joinedFolder=[sectionLabel,folderName].filter(Boolean).join(' / ');
-  return await attachPortfolioFileToShare(file,shareId,days,joinedFolder||sectionLabel||'');
+  try{
+    let blob=null;
+
+    // 1) الملف المحلي في IndexedDB
+    if(file?.storage==='idb' && file?.id){
+      blob=await idbGetFile(file.id);
+    }
+
+    // 2) ملفات قديمة محفوظة كـ data URL
+    if(!blob && file?.data){
+      const r=await fetch(file.data);
+      blob=await r.blob();
+    }
+
+    // 3) إن كان له مسار سحابي، نزّله ثم أعد ربطه بالمشاركة
+    if(!blob && file?.cloud_path){
+      const {data,error}=await sb.storage.from('shared-artifacts').download(file.cloud_path);
+      if(!error && data) blob=data;
+    }
+
+    if(!blob) return false;
+
+    const name=file?.name||'ملف';
+    const type=file?.type||blob.type||'application/octet-stream';
+
+    // مهم: أول مجلد يجب أن يكون uid حسب سياسة التخزين الحالية
+    const path=`${session.user.id}/${token}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${usSafeName(name)}`;
+
+    const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,blob,{
+      contentType:type,
+      upsert:false
+    });
+    if(upErr){
+      console.warn('share upload failed',upErr);
+      return false;
+    }
+
+    const {data:signed,error:signedErr}=await sb.storage
+      .from('shared-artifacts')
+      .createSignedUrl(path,days*86400);
+
+    if(signedErr || !signed?.signedUrl){
+      console.warn('signed url failed',signedErr);
+      return false;
+    }
+
+    const joinedFolder=[sectionLabel,folderName].filter(Boolean).join(' / ');
+
+    const {error:itemErr}=await sb.from('share_items').insert({
+      share_id:shareId,
+      file_name:name,
+      mime_type:type,
+      public_url:signed.signedUrl,
+      folder_name:joinedFolder||sectionLabel||null
+    });
+
+    if(itemErr){
+      console.warn('share item insert failed',itemErr);
+      return false;
+    }
+
+    return true;
+  }catch(e){
+    console.warn('fpUploadStoredFile',e);
+    return false;
+  }
 }
 
 async function createFullPortfolioShare(){
