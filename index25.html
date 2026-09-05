@@ -693,6 +693,11 @@ body.cover-open{overflow:hidden}
     <div class="field"><label>الأيقونة — اكتبي أي إيموجي</label><input id="folderIconInput" maxlength="6" placeholder="📁"></div>
     <div class="field"><label>لون المجلد — مفتوح بالكامل</label><div class="color-row"><input id="folderColorInput" type="color" value="#2f5d50"><input id="folderColorText" value="#2f5d50" oninput="syncColorFromText()"></div></div>
     <div class="field full"><label>صورة غلاف للمجلد من الجوال (اختياري)</label><input id="folderCoverInput" type="file" accept="image/*" onchange="previewFolderCover(event)"><div class="preview-box" id="folderCoverPreview"><span>بدون صورة — ستظهر الأيقونة واللون</span></div></div>
+    <div class="field full hidden" id="folderModalFilesField">
+      <label>📎 إضافة ملفات داخل هذا المجلد</label>
+      <input id="folderModalFilesInput" type="file" multiple onchange="addFilesFromFolderEditor(event)">
+      <small>PDF • Word • Excel • صور • فيديو • أي مستند</small>
+    </div>
   </div>
   <div class="modal-actions">
     <button class="action secondary" onclick="closeModal('folderModal')">إلغاء</button>
@@ -1298,6 +1303,8 @@ function openFolderEditor(id=null){
   $('folderNameInput').value=f?.name||'';$('folderIconInput').value=f?.icon||'📁';
   const c=f?.color||'#2f5d50';$('folderColorInput').value=validHex(c)?c:'#2f5d50';$('folderColorText').value=c;
   $('folderCoverInput').value='';renderCoverPreview(f?.cover||null);
+  const fmFiles=$('folderModalFilesField');if(fmFiles)fmFiles.classList.toggle('hidden',!f);
+  const fmInput=$('folderModalFilesInput');if(fmInput)fmInput.value='';
   $('deleteFolderBtn').classList.toggle('hidden',!f);$('moveFolderUpBtn').classList.toggle('hidden',!f);$('moveFolderDownBtn').classList.toggle('hidden',!f);
   openModal('folderModal');
 }
@@ -1418,9 +1425,19 @@ async function addFilesToStorage(input,ctx){
   input.value='';
   if(!metas.length)return;
   if(ctx.kind==='root'){const a=getRootFiles(ctx.section||currentSection);a.unshift(...metas);saveRootFiles(a,ctx.section||currentSection);renderRootFiles()}
-  else{const a=getFolderFiles(ctx.folderId,ctx.section||currentSection);a.unshift(...metas);saveFolderFiles(a,ctx.folderId,ctx.section||currentSection);refreshFolderView()}
+  else{
+    const a=getFolderFiles(ctx.folderId,ctx.section||currentSection);
+    a.unshift(...metas);
+    saveFolderFiles(a,ctx.folderId,ctx.section||currentSection);
+    if(String(currentFolderId||'')===String(ctx.folderId||'')) refreshFolderView();
+    else renderFolders();
+  }
   setUploadStatus(`✅ تم حفظ ${done} ملف${done===1?'':'ات'} بنجاح. سيظهر الآن داخل ${ctx.kind==='root'?'القسم':'المجلد'}.`);
   toast(`تم حفظ ${done} ملف${done===1?'':'ات'} بنجاح`);
+}
+function addFilesFromFolderEditor(e){
+  if(!editingFolderId){toast('احفظي المجلد أولًا ثم أضيفي الملفات');return}
+  addFilesToStorage(e.target,{kind:'folder',folderId:editingFolderId,section:currentSection})
 }
 function addRootFiles(e){addFilesToStorage(e.target,{kind:'root',section:currentSection})}
 function addFolderFiles(e){if(!currentFolderId)return;addFilesToStorage(e.target,{kind:'folder',folderId:currentFolderId,section:currentSection})}
