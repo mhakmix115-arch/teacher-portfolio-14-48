@@ -1457,21 +1457,62 @@ async function hydratePreview(card,file){
   }catch(e){console.error(e)}
 }
 async function openFile(file){
-  if(file.cloud_url){
-    const w=window.open(file.cloud_url,'_blank','noopener');
-    if(!w) location.href=file.cloud_url;
-    return;
-  }
-  if(file.cloud_path){
-    const url=await signedPortfolioCloudUrl(file.cloud_path,3600);
-    if(url){
-      const w=window.open(url,'_blank','noopener');
-      if(!w) location.href=url;
+  // Safari على iPhone قد يمنع window.open بعد await؛ افتح نافذة مباشرة من نقرة المستخدم.
+  let pre=null;
+  try{
+    pre=window.open('about:blank','_blank');
+    if(pre) pre.document.write('<div dir="rtl" style="font-family:system-ui;padding:24px;text-align:center">جاري فتح الملف…</div>');
+  }catch(e){}
+
+  try{
+    if(file.cloud_url){
+      if(pre) pre.location.href=file.cloud_url;
+      else location.href=file.cloud_url;
       return;
     }
+
+    if(file.cloud_path){
+      const url=await signedPortfolioCloudUrl(file.cloud_path,3600);
+      if(url){
+        if(pre) pre.location.href=url;
+        else location.href=url;
+        return;
+      }
+    }
+
+    if(file.data){
+      if(pre){
+        if((file.type||'').startsWith('image/')) pre.document.body.innerHTML=`<img src="${file.data}" style="max-width:100%;height:auto">`;
+        else if((file.type||'').startsWith('video/')) pre.document.body.innerHTML=`<video src="${file.data}" controls autoplay style="max-width:100%"></video>`;
+        else pre.location.href=file.data;
+      }else location.href=file.data;
+      return;
+    }
+
+    const blob=await idbGetFile(file.id);
+    if(!blob){
+      if(pre) pre.close();
+      toast('تعذر فتح الملف. أعيدي رفعه مرة واحدة ليُحفظ في السحابة.');
+      return;
+    }
+
+    const url=URL.createObjectURL(blob);
+    if(pre) pre.location.href=url;
+    else{
+      const a=document.createElement('a');
+      a.href=url;
+      a.target='_blank';
+      a.download=file.name||'ملف';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+    setTimeout(()=>URL.revokeObjectURL(url),120000);
+  }catch(e){
+    console.error(e);
+    try{if(pre) pre.close()}catch(_){}
+    toast('تعذر فتح الملف.');
   }
-  if(file.data){const w=window.open();if(w){if((file.type||'').startsWith('image/'))w.document.write(`<img src="${file.data}" style="max-width:100%;height:auto">`);else if((file.type||'').startsWith('video/'))w.document.write(`<video src="${file.data}" controls autoplay style="max-width:100%"></video>`);else w.location=file.data}return}
-  const blob=await idbGetFile(file.id);if(!blob){toast('تعذر العثور على الملف على هذا الجهاز');return}const url=URL.createObjectURL(blob);const w=window.open(url,'_blank');if(!w){const a=document.createElement('a');a.href=url;a.download=file.name;a.click()}setTimeout(()=>URL.revokeObjectURL(url),60000)
 }
 
 function cleanText(v){return String(v??'').replace(/\s+/g,' ').trim()}
@@ -2392,6 +2433,12 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(handleShareGuestLink,3
       <div id="usGuestMeta" class="us-note"></div>
       <div class="us-field" style="margin-top:14px"><label>ملاحظة المعلمة</label><div id="usGuestNote" class="us-ok"></div></div>
       <div class="us-field" style="margin-top:14px"><label>الملفات المرفقة</label><div id="usGuestFiles" class="us-files"></div></div>
+      <div id="usGuestViewerWrap" class="hidden" style="margin-top:14px">
+        <div class="us-field">
+          <label>معاينة الملف</label>
+          <div id="usGuestViewer" style="background:#fff;border:1px solid #ddd;border-radius:14px;overflow:hidden;min-height:360px"></div>
+        </div>
+      </div>
 
       <div id="usAdminForm" class="hidden" style="margin-top:18px">
         <h2 style="color:#075b45">✅ اعتماد الإدارة</h2>
@@ -2522,6 +2569,62 @@ function unifiedShareClose(){
 function usSafeName(name){
   return String(name||'file').replace(/[^\w\u0600-\u06FF.\-]+/g,'_').slice(-120);
 }
+
+async function attachPortfolioFileToShare(file,shareId,days,folderName=''){
+  const name=file.name||'ملف';
+  const type=file.type||'application/octet-stream';
+
+  try{
+    // إذا الملف له مسار سحابي دائم، أنشئ رابطًا موقّعًا مباشرة.
+    if(file.cloud_path){
+      const {data:signed,error:signedErr}=await sb.storage
+        .from('shared-artifacts')
+        .createSignedUrl(file.cloud_path,days*86400);
+      if(!signedErr && signed?.signedUrl){
+        const {error:itemErr}=await sb.from('share_items').insert({
+          share_id:shareId,
+          file_name:name,
+          mime_type:type,
+          public_url:signed.signedUrl,
+          folder_name:folderName||null
+        });
+        if(!itemErr) return true;
+      }
+    }
+
+    // وإلا استخدم النسخة المحلية ثم ارفعها للمشاركة.
+    const blob=file.storage ? await blobForPortfolioFile(file) : file;
+    if(!blob) return false;
+
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session) return false;
+
+    const path=`${session.user.id}/shares/${shareId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${usSafeName(name)}`;
+    const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,blob,{
+      contentType:type||blob.type||'application/octet-stream',
+      upsert:false
+    });
+    if(upErr) return false;
+
+    const {data:signed,error:signedErr}=await sb.storage.from('shared-artifacts').createSignedUrl(path,days*86400);
+    if(signedErr || !signed?.signedUrl) return false;
+
+    const {error:itemErr}=await sb.from('share_items').insert({
+      share_id:shareId,
+      file_name:name,
+      mime_type:type||blob.type||'application/octet-stream',
+      public_url:signed.signedUrl,
+      folder_name:folderName||null
+    });
+    if(itemErr) return false;
+
+    return true;
+  }catch(e){
+    console.warn('attachPortfolioFileToShare',e);
+    return false;
+  }
+}
+
 async function unifiedCreateShare(){
   usStatus('');
   try{
@@ -2558,20 +2661,9 @@ async function unifiedCreateShare(){
     let uploaded=0, skipped=0;
 
     async function uploadOne(file,folderName=''){
-      const blob=file.storage ? await blobForPortfolioFile(file) : file;
-      if(!blob){skipped++;return}
-      const name=file.name||'ملف';
-      const type=file.type||blob.type||'application/octet-stream';
-      const path=`${session.user.id}/${token}/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${usSafeName(name)}`;
-      const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,blob,{contentType:type,upsert:false});
-      if(upErr){console.warn(upErr);skipped++;return}
-      const {data:signed,error:signedErr}=await sb.storage.from('shared-artifacts').createSignedUrl(path,days*86400);
-      if(signedErr){console.warn(signedErr);skipped++;return}
-      const {error:itemErr}=await sb.from('share_items').insert({
-        share_id:shareId,file_name:name,mime_type:type,public_url:signed.signedUrl,folder_name:folderName||null
-      });
-      if(itemErr){console.warn(itemErr);skipped++;return}
-      uploaded++;
+      const ok=await attachPortfolioFileToShare(file,shareId,days,folderName);
+      if(ok) uploaded++;
+      else skipped++;
     }
 
     for(const item of portfolioFiles) await uploadOne(item.file,item.folder||'');
@@ -2590,7 +2682,7 @@ async function unifiedCreateShare(){
     document.getElementById('usCopyBtn').classList.remove('hidden');
     document.getElementById('usSendBtn').classList.remove('hidden');
 
-    usStatus(`✅ تم إنشاء المشاركة وإرفاق ${uploaded} ملف للاطلاع${skipped?` — تعذر إرفاق ${skipped} ملف`:''}.`);
+    usStatus(skipped?`⚠️ تم إنشاء الرابط وإرفاق ${uploaded} ملف، وتعذر إرفاق ${skipped} ملف. أعيدي رفع الملف المتعذر مرة واحدة ثم شاركيه من جديد.`:`✅ تم إنشاء المشاركة وإرفاق ${uploaded} ملف للاطلاع.`);
     usSelectedPortfolioFiles=[];
   }catch(e){
     console.error(e);
@@ -2642,29 +2734,8 @@ async function fpCollectSnapshot(){
 }
 
 async function fpUploadStoredFile(file, session, token, shareId, days, folderName, sectionLabel){
-  const blob=await blobForPortfolioFile(file);
-  if(!blob) return false;
-
-  const name=file.name||'ملف';
-  const type=file.type||blob.type||'application/octet-stream';
-  const path=`${session.user.id}/${token}/full/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${usSafeName(name)}`;
-
-  const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,blob,{contentType:type,upsert:false});
-  if(upErr){console.warn(upErr);return false}
-
-  const {data:signed,error:signedErr}=await sb.storage.from('shared-artifacts').createSignedUrl(path,days*86400);
-  if(signedErr){console.warn(signedErr);return false}
-
   const joinedFolder=[sectionLabel,folderName].filter(Boolean).join(' / ');
-  const {error:itemErr}=await sb.from('share_items').insert({
-    share_id:shareId,
-    file_name:name,
-    mime_type:type,
-    public_url:signed.signedUrl,
-    folder_name:joinedFolder||sectionLabel||null
-  });
-  if(itemErr){console.warn(itemErr);return false}
-  return true;
+  return await attachPortfolioFileToShare(file,shareId,days,joinedFolder||sectionLabel||'');
 }
 
 async function createFullPortfolioShare(){
@@ -3300,6 +3371,32 @@ async function unifiedSubmitFamily(){
     usGuestStatus('تم إرسال التوصية.',false);
   }catch(e){console.error(e);usGuestStatus(e?.message||'تعذر الإرسال.',true);}
 }
+
+let usGuestItems=[];
+
+function unifiedViewGuestFile(index){
+  const f=usGuestItems[index];
+  if(!f?.public_url){usGuestStatus('تعذر فتح هذا الملف.',true);return}
+
+  const wrap=document.getElementById('usGuestViewerWrap');
+  const viewer=document.getElementById('usGuestViewer');
+  wrap.classList.remove('hidden');
+  const type=String(f.mime_type||'').toLowerCase();
+  const url=f.public_url;
+
+  if(type.startsWith('image/')){
+    viewer.innerHTML=`<img src="${url}" alt="${esc(f.file_name||'ملف')}" style="width:100%;max-height:75vh;object-fit:contain;display:block">`;
+  }else if(type.startsWith('video/')){
+    viewer.innerHTML=`<video src="${url}" controls playsinline style="width:100%;max-height:70vh;display:block"></video>`;
+  }else{
+    viewer.innerHTML=`<iframe src="${url}" title="${esc(f.file_name||'ملف')}" style="width:100%;height:70vh;border:0;background:#fff"></iframe>
+      <div style="padding:10px;text-align:center">
+        <a class="action secondary" href="${url}" target="_blank" rel="noopener">فتح الملف في صفحة مستقلة</a>
+      </div>`;
+  }
+  setTimeout(()=>wrap.scrollIntoView({behavior:'smooth',block:'start'}),50);
+}
+
 async function unifiedLoadGuest(){
   const token=new URLSearchParams(location.search).get('share');
   if(!token)return;
@@ -3328,9 +3425,10 @@ async function unifiedLoadGuest(){
       (sectionText?'<br><br><b>محتوى القسم:</b><br><div style="white-space:pre-wrap">'+esc(sectionText)+'</div>':'')||
       'لا توجد ملاحظة.';
     const files=data.items||[];
+    usGuestItems=files;
     document.getElementById('usGuestFiles').innerHTML=files.length
-      ? files.map(f=>`<div class="us-file"><div><b>${String(f.file_name||'ملف').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}</b>${f.folder_name?'<br><small>'+esc(f.folder_name)+'</small>':''}</div><a class="action secondary" href="${f.public_url}" target="_blank" rel="noopener">👁️ عرض المحتوى</a></div>`).join('')
-      : '<div class="us-err">لم يتم إرفاق ملفات في هذه المشاركة.</div>';
+      ? files.map((f,i)=>`<div class="us-file"><div><b>${String(f.file_name||'ملف').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}</b>${f.folder_name?'<br><small>'+esc(f.folder_name)+'</small>':''}</div><button class="action secondary" type="button" onclick="unifiedViewGuestFile(${i})">👁️ عرض الملف هنا</button></div>`).join('')
+      : '<div class="us-err">لم تصل ملفات مع هذه المشاركة. أعيدي إنشاء رابط المشاركة لهذا الملف.</div>';
 
     document.getElementById('usAdminForm').classList.toggle('hidden',data.role!=='admin');
     document.getElementById('usFamilyForm').classList.toggle('hidden',data.role!=='family');
