@@ -1411,7 +1411,8 @@ async function addFilesToStorage(input,ctx){
       const blob=f.slice(0,f.size,f.type||'application/octet-stream');
       await idbPutFile(id,blob);
       const cloudPath=await uploadPortfolioBlobToCloud(id,f.name,f.type||'application/octet-stream',blob);
-      metas.push({id,name:f.name,type:f.type||'application/octet-stream',size:f.size||0,storage:'idb',cloud_path:cloudPath||null,createdAt:now(),updatedAt:now()});
+      metas.push({id,name:f.name,type:f.type||'application/octet-stream',size:f.size||0,storage:'idb',cloud_path:cloudPath||null,cloud_ready:!!cloudPath,createdAt:now(),updatedAt:now()});
+      if(!cloudPath) setUploadStatus(`⚠️ تم حفظ «${f.name}» على هذا الجهاز فقط. لن يسمح التطبيق بإرسال رابط ناقص حتى تتم مزامنته.`,true);
       done++;
       setUploadStatus(`جاري الحفظ: ${done} من ${incoming.length} — ${f.name}`);
     }catch(err){
@@ -2646,55 +2647,76 @@ async function unifiedCreateShare(){
     const note=document.getElementById('usNote').value.trim();
     const sectionText=localStorage.getItem(NS+'text_'+sectionKey)||'';
 
-    const {data,error}=await sb.rpc('create_share_link',{
-      p_role:role,p_section:sectionKey,p_title:sectionDisplay,
-      p_snapshot:{text:note,section_text:sectionText},p_days:days
-    });
-    if(error) throw error;
-
-    const token=data.token, shareId=data.id;
-    let portfolioFiles=[];
-
+    const portfolioFiles=[];
     if(usSelectedPortfolioFiles.length){
-      portfolioFiles=[...usSelectedPortfolioFiles];
+      for(const item of usSelectedPortfolioFiles) portfolioFiles.push(item);
     }else{
-      for(const f of getRootFiles(sectionKey)) portfolioFiles.push({file:f,section:sectionKey,folder:''});
+      for(const f of getRootFiles(sectionKey)) portfolioFiles.push({file:f,folder:''});
       for(const folder of getFolders(sectionKey)){
-        for(const f of getFolderFiles(folder.id,sectionKey)){
-          portfolioFiles.push({file:f,section:sectionKey,folder:folder.name||''});
-        }
+        for(const f of getFolderFiles(folder.id,sectionKey)) portfolioFiles.push({file:f,folder:folder.name||''});
       }
     }
 
-    let uploaded=0, skipped=0;
-
-    async function uploadOne(file,folderName=''){
-      const ok=await attachPortfolioFileToShare(file,shareId,days,folderName);
-      if(ok) uploaded++;
-      else skipped++;
+    // افحص الملفات أولاً ولا تنشئ رابطًا ناقصًا
+    const problems=[];
+    for(const item of portfolioFiles){
+      const r=await ensurePortfolioFileCloudReady(item.file);
+      if(!r.ok) problems.push({name:item.file?.name||'ملف',folder:item.folder||'',reason:r.reason});
+    }
+    if(problems.length){
+      usStatus(shareProblemsHtml(problems),true,true);
+      return;
     }
 
-    for(const item of portfolioFiles) await uploadOne(item.file,item.folder||'');
+    usStatus('⏳ جميع الملفات جاهزة. جاري إنشاء الرابط…');
 
-    const picked=[...(document.getElementById('usFilesInput').files||[])];
-    for(const file of picked) await uploadOne(file,'مرفق إضافي');
+    const {data,error}=await sb.rpc('create_share_link',{
+      p_role:role,p_section:sectionKey,p_title:sectionDisplay,
+      p_snapshot:{section:sectionKey,title:sectionDisplay,text:sectionText,note},
+      p_days:days
+    });
+    if(error) throw error;
 
-    usShareUrl='https://mhakmix115-arch.github.io/teacher-portfolio-14-48/index25.html?share='+encodeURIComponent(token);
-    const qr=document.getElementById('usQr');
-    qr.innerHTML='';
-    if(window.QRCode) new QRCode(qr,{text:usShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
-    else qr.innerHTML='<b>تم إنشاء الرابط. استخدمي زر نسخ الرابط.</b>';
+    const shareId=data.id,token=data.token;
+    let uploaded=0;
+    const failed=[];
 
-    const urlEl=document.getElementById('usUrl');
-    urlEl.textContent=usShareUrl; urlEl.classList.remove('hidden');
-    document.getElementById('usCopyBtn').classList.remove('hidden');
-    document.getElementById('usSendBtn').classList.remove('hidden');
+    // الملفات المحلية/السحابية
+    for(const item of portfolioFiles){
+      const r=await signedShareItemFromCloud(item.file,shareId,days,item.folder||'');
+      if(r.ok) uploaded++;
+      else failed.push({name:item.file?.name||'ملف',folder:item.folder||'',reason:r.reason});
+    }
 
-    usStatus(skipped?`⚠️ تم إنشاء الرابط وإرفاق ${uploaded} ملف، وتعذر إرفاق ${skipped} ملف. أعيدي رفع الملف المتعذر مرة واحدة ثم شاركيه من جديد.`:`✅ تم إنشاء المشاركة وإرفاق ${uploaded} ملف للاطلاع.`);
-    usSelectedPortfolioFiles=[];
+    // الملفات المختارة من الجهاز مباشرة في نافذة المشاركة
+    const extra=[...(document.getElementById('usFiles')?.files||[])];
+    for(const f of extra){
+      const id='share_extra_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+      const blob=f.slice(0,f.size,f.type||'application/octet-stream');
+      await idbPutFile(id,blob);
+      const temp={id,name:f.name,type:f.type||'application/octet-stream',size:f.size,storage:'idb'};
+      const r=await ensurePortfolioFileCloudReady(temp);
+      if(r.ok){
+        const add=await signedShareItemFromCloud(temp,shareId,days,'');
+        if(add.ok) uploaded++; else failed.push({name:f.name,reason:add.reason});
+      }else failed.push({name:f.name,reason:r.reason});
+    }
+
+    if(failed.length){
+      usStatus(shareProblemsHtml(failed),true,true);
+      return;
+    }
+
+    usShareUrl=`${location.origin}${location.pathname}?share=${encodeURIComponent(token)}`;
+    document.getElementById('usUrl').textContent=usShareUrl;
+    document.getElementById('usShareBox').classList.remove('hidden');
+    const qr=document.getElementById('usQr');qr.innerHTML='';
+    if(window.QRCode)new QRCode(qr,{text:usShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
+
+    usStatus(`✅ جاهز للإرسال. تم إرفاق ${uploaded} ملف بنجاح.`);
   }catch(e){
     console.error(e);
-    usStatus(e?.message||'تعذر إنشاء المشاركة.',true);
+    usStatus(e.message||'تعذر إنشاء المشاركة',true);
   }
 }
 
@@ -2739,6 +2761,129 @@ async function fpCollectSnapshot(){
     });
   }
   return {aliases,sections};
+}
+
+
+/* ===== مشاركة مستقرة: لا يُنشأ رابط إلا بعد التأكد من جاهزية كل الملفات ===== */
+async function ensurePortfolioFileCloudReady(file){
+  if(!file) return {ok:false,reason:'ملف غير معروف'};
+
+  try{
+    // إذا عنده مسار سحابي، نتأكد أنه صالح فعلاً
+    if(file.cloud_path){
+      const {data,error}=await sb.storage.from('shared-artifacts').createSignedUrl(file.cloud_path,300);
+      if(!error && data?.signedUrl) return {ok:true,path:file.cloud_path};
+    }
+
+    // حاول أخذ النسخة المحلية الحقيقية
+    let blob=null;
+    if(file.storage==='idb' && file.id) blob=await idbGetFile(file.id);
+    if(!blob && file.data){
+      const r=await fetch(file.data);
+      blob=await r.blob();
+    }
+
+    if(!blob){
+      return {ok:false,reason:'النسخة الأصلية غير موجودة في هذا المتصفح'};
+    }
+
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session) return {ok:false,reason:'يلزم تسجيل دخول المعلمة'};
+
+    const name=file.name||'ملف';
+    const type=file.type||blob.type||'application/octet-stream';
+    const path=`${session.user.id}/portfolio/${file.id||('f_'+Date.now())}_${usSafeName(name)}`;
+
+    const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,blob,{
+      contentType:type,
+      upsert:true
+    });
+    if(upErr){
+      return {ok:false,reason:'تعذر حفظ النسخة السحابية'};
+    }
+
+    file.cloud_path=path;
+    return {ok:true,path};
+  }catch(e){
+    console.warn('ensurePortfolioFileCloudReady',e);
+    return {ok:false,reason:'تعذر تجهيز الملف'};
+  }
+}
+
+async function signedShareItemFromCloud(file,shareId,days,folderName=''){
+  try{
+    const ready=await ensurePortfolioFileCloudReady(file);
+    if(!ready.ok) return {ok:false,reason:ready.reason};
+
+    const {data:signed,error:signedErr}=await sb.storage
+      .from('shared-artifacts')
+      .createSignedUrl(ready.path,days*86400);
+
+    if(signedErr || !signed?.signedUrl){
+      return {ok:false,reason:'تعذر إنشاء رابط عرض للملف'};
+    }
+
+    const {error:itemErr}=await sb.from('share_items').insert({
+      share_id:shareId,
+      file_name:file.name||'ملف',
+      mime_type:file.type||'application/octet-stream',
+      public_url:signed.signedUrl,
+      folder_name:folderName||null
+    });
+
+    if(itemErr) return {ok:false,reason:'تعذر ربط الملف بالمشاركة'};
+    return {ok:true};
+  }catch(e){
+    console.warn('signedShareItemFromCloud',e);
+    return {ok:false,reason:'تعذر ربط الملف بالمشاركة'};
+  }
+}
+
+async function preflightFullPortfolioFiles(){
+  const problems=[];
+  const prepared=[];
+
+  for(const sec of fpAllSections()){
+    const roots=getRootFiles(sec.key)||[];
+    let rootChanged=false;
+    for(const file of roots){
+      const r=await ensurePortfolioFileCloudReady(file);
+      if(r.ok){
+        if(file.cloud_path===r.path) rootChanged=true;
+        prepared.push({file,folder:'',section:sec.label});
+      }else{
+        problems.push({name:file.name||'ملف',section:sec.label,reason:r.reason});
+      }
+    }
+    if(rootChanged) saveRootFiles(roots,sec.key);
+
+    const folders=getFolders(sec.key)||[];
+    for(const folder of folders){
+      const files=getFolderFiles(folder.id,sec.key)||[];
+      let changed=false;
+      for(const file of files){
+        const before=file.cloud_path||'';
+        const r=await ensurePortfolioFileCloudReady(file);
+        if(r.ok){
+          if((file.cloud_path||'')!==before) changed=true;
+          prepared.push({file,folder:folder.name||'مجلد',section:sec.label});
+        }else{
+          problems.push({name:file.name||'ملف',section:sec.label,folder:folder.name||'',reason:r.reason});
+        }
+      }
+      if(changed) saveFolderFiles(files,folder.id,sec.key);
+    }
+  }
+
+  return {prepared,problems};
+}
+
+function shareProblemsHtml(problems){
+  const names=problems.slice(0,8).map(p=>`• ${esc(p.name)}${p.folder?` — ${esc(p.folder)}`:''}`).join('<br>');
+  const more=problems.length>8?`<br>… و${problems.length-8} ملف آخر`:'';
+  return `<div class="us-err"><b>⛔ لم يتم إنشاء الرابط حتى لا يصلك رابط ناقص.</b><br>
+  هذه الملفات تحتاج إعادة ربط مرة واحدة من الجهاز/المتصفح الذي رُفعت منه:<br>${names}${more}<br>
+  <small>بعد إعادة اختيارها من زر «مستند / ملف» ستُحفظ سحابيًا وتعمل المشاركة من أي جهاز.</small></div>`;
 }
 
 async function fpUploadStoredFile(file, session, token, shareId, days, folderName, sectionLabel){
@@ -2813,21 +2958,30 @@ async function fpUploadStoredFile(file, session, token, shareId, days, folderNam
 async function createFullPortfolioShare(){
   const status=document.getElementById('fpsStatus');
   const btn=document.getElementById('fpsCreateBtn');
-  status.innerHTML='<div class="us-ok">⏳ جاري إنشاء رابط الاطلاع…</div>';
-  if(btn){btn.disabled=true;btn.textContent='جاري الإنشاء…';}
+  status.innerHTML='<div class="us-ok">⏳ جاري فحص الملفات قبل إنشاء الرابط…</div>';
+  document.getElementById('fpsShareBox').classList.add('hidden');
+  if(btn){btn.disabled=true;btn.textContent='جاري الفحص…';}
 
   try{
     const {data:{session}}=await sb.auth.getSession();
-    if(!session){
-      throw new Error('سجّلي دخول المعلمة بحساب Microsoft أولًا ثم أعيدي المحاولة.');
+    if(!session) throw new Error('يلزم تسجيل دخول المعلمة بحساب Microsoft أولًا.');
+
+    // الفحص أولاً: لا ننشئ أي رابط ناقص
+    const check=await preflightFullPortfolioFiles();
+    if(check.problems.length){
+      status.innerHTML=shareProblemsHtml(check.problems);
+      if(btn){btn.disabled=false;btn.textContent='إعادة الفحص بعد إصلاح الملفات';}
+      return;
     }
+
+    status.innerHTML=`<div class="us-ok">✅ جميع الملفات جاهزة (${check.prepared.length}). جاري إنشاء الرابط…</div>`;
 
     const role=document.getElementById('fpsRole').value;
     const days=Number(document.getElementById('fpsDays').value||7);
     const note=document.getElementById('fpsNote').value.trim();
     const collected=await fpCollectSnapshot();
-
     const rpcRole=role==='viewer'?'family':role;
+
     const {data,error}=await sb.rpc('create_share_link',{
       p_role:rpcRole,
       p_section:'__FULL_PORTFOLIO__',
@@ -2843,56 +2997,40 @@ async function createFullPortfolioShare(){
     });
     if(error) throw error;
 
-    const token=data.token, shareId=data.id;
+    const token=data.token,shareId=data.id;
+    let uploaded=0;
+    const failed=[];
 
-    // أظهر الرابط والباركود فورًا قبل رفع الملفات حتى لا يبدو الزر معطّلًا
+    for(let i=0;i<check.prepared.length;i++){
+      const item=check.prepared[i];
+      status.innerHTML=`<div class="us-ok">⏳ ربط الملفات ${i+1} من ${check.prepared.length}…</div>`;
+      const joined=[item.section,item.folder].filter(Boolean).join(' / ');
+      const r=await signedShareItemFromCloud(item.file,shareId,days,joined);
+      if(r.ok) uploaded++;
+      else failed.push({name:item.file.name||'ملف',folder:item.folder||'',reason:r.reason});
+    }
+
+    if(failed.length){
+      // لا نعرض الرابط إذا المشاركة ناقصة
+      status.innerHTML=shareProblemsHtml(failed);
+      if(btn){btn.disabled=false;btn.textContent='إعادة المحاولة';}
+      return;
+    }
+
     fullPortfolioShareUrl=`${location.origin}${location.pathname}?portfolio_share=${encodeURIComponent(token)}`;
     document.getElementById('fpsUrl').textContent=fullPortfolioShareUrl;
     document.getElementById('fpsShareBox').classList.remove('hidden');
 
     const qr=document.getElementById('fpsQr');
     qr.innerHTML='';
-    if(window.QRCode){
-      new QRCode(qr,{text:fullPortfolioShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
-    }else{
-      qr.innerHTML='<b>تم إنشاء الرابط.</b>';
-    }
+    if(window.QRCode)new QRCode(qr,{text:fullPortfolioShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
 
-    status.innerHTML='<div class="us-ok">✅ تم إنشاء الرابط. الآن جاري تجهيز محتوى الملف ورفع المرفقات…</div>';
-    document.getElementById('fpsShareBox').scrollIntoView({behavior:'smooth',block:'nearest'});
-
-    const queue=[];
-    for(const sec of fpAllSections()){
-      for(const f of getRootFiles(sec.key)||[]){
-        queue.push({f,folder:'',section:sec.label});
-      }
-      for(const folder of getFolders(sec.key)||[]){
-        for(const f of getFolderFiles(folder.id,sec.key)||[]){
-          queue.push({f,folder:folder.name||'مجلد',section:sec.label});
-        }
-      }
-    }
-
-    let uploaded=0, skipped=0;
-    const total=queue.length;
-
-    for(let i=0;i<queue.length;i++){
-      const item=queue[i];
-      status.innerHTML=`<div class="us-ok">⏳ تجهيز الملفات ${i+1} من ${total}…</div>`;
-      if(await fpUploadStoredFile(item.f,session,token,shareId,days,item.folder,item.section)){
-        uploaded++;
-      }else{
-        skipped++;
-      }
-    }
-
-    status.innerHTML=`<div class="us-ok">✅ جاهز للإرسال. تم إرفاق ${uploaded} ملف${skipped?`، وتعذر إرفاق ${skipped} ملف`:''}.</div>`;
-    if(btn){btn.textContent='تم إنشاء الرابط ✓';}
+    status.innerHTML=`<div class="us-ok">✅ جاهز للإرسال. تم إرفاق ${uploaded} من ${uploaded} ملف بنجاح.</div>`;
+    if(btn){btn.disabled=false;btn.textContent='إنشاء رابط جديد';}
   }catch(e){
     console.error(e);
     status.innerHTML=`<div class="us-err">❌ ${esc(e.message||'تعذر إنشاء الرابط')}</div>`;
     if(btn){btn.disabled=false;btn.textContent='إعادة المحاولة';}
-    try{status.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(_){}
   }
 }
 
