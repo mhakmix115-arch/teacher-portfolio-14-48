@@ -1452,43 +1452,91 @@ async function availableStorageText(){try{if(navigator.storage?.estimate){const 
 async function addFilesToStorage(input,ctx){
   const incoming=[...(input.files||[])];
   if(!incoming.length){setUploadStatus('لم يتم اختيار ملف. اختاري ملفًا من تطبيق «الملفات» ثم اضغطي «تأكيد».');return}
-  const total=incoming.reduce((n,f)=>n+(f.size||0),0);
+
+  /* v26: لا نعتمد أي ملف جديد داخل ملف الإنجاز إلا بعد نجاح نسخه إلى السحابة.
+     هذا يمنع ظهور الملف للمعلمة محليًا ثم فشل مشاركته لاحقًا من جهاز آخر. */
+  let session=null;
+  try{ session=await activeCloudSession(); }catch(e){}
+  if(!session){
+    input.value='';
+    setUploadStatus('❌ لم يتم حفظ الملف: يلزم تسجيل الدخول بحساب Microsoft في هذا المتصفح أولًا.',true);
+    alert('يلزم تسجيل الدخول بحساب Microsoft قبل رفع الملفات حتى تُحفظ سحابيًا وتعمل المشاركة من أي جهاز.\n\nسيتم فتح تسجيل الدخول الآن، وبعد العودة اختاري الملف مرة أخرى.');
+    try{ await signInWithMicrosoft(); }catch(e){}
+    return;
+  }
+
+  const cloudTest=await testPortfolioCloudConnection();
+  if(!cloudTest.ok){
+    input.value='';
+    const reason=cloudTest.message||'تعذر الاتصال بتخزين الملفات';
+    setUploadStatus(`❌ لم يتم حفظ الملف. فشل التخزين السحابي: ${reason}`,true);
+    alert('لم يتم حفظ الملف حتى لا يظهر عندك كأنه ناجح وهو غير قابل للمشاركة.\n\nسبب Supabase:\n'+reason);
+    return;
+  }
+
   const free=await availableStorageText();
   const names=incoming.map(f=>`${f.name} (${fileSizeText(f.size||0)})`).join(' • ');
   setUploadStatus(`✅ وصل الاختيار للموقع: ${names}${free?' • المساحة المتاحة تقريبًا '+free:''}`);
-  const metas=[];let done=0;
+
+  const metas=[];
+  const failed=[];
+  let done=0;
   toast(`جاري حفظ ${incoming.length} ملف...`);
+
   for(const f of incoming){
     const id='f_'+now()+'_'+Math.random().toString(36).slice(2,9);
+    const type=f.type||'application/octet-stream';
     try{
-      /* تحويل File إلى Blob يحسن التوافق مع IndexedDB في Safari/iPhone */
-      const blob=f.slice(0,f.size,f.type||'application/octet-stream');
-      await idbPutFile(id,blob);
-      const cloudPath=await uploadPortfolioBlobToCloud(id,f.name,f.type||'application/octet-stream',blob);
-      metas.push({id,name:f.name,type:f.type||'application/octet-stream',size:f.size||0,storage:'idb',cloud_path:cloudPath||null,cloud_ready:!!cloudPath,createdAt:now(),updatedAt:now()});
-      if(!cloudPath) setUploadStatus(`⚠️ تم حفظ «${f.name}» على هذا الجهاز فقط. لن يسمح التطبيق بإرسال رابط ناقص حتى تتم مزامنته.`,true);
+      const blob=f.slice(0,f.size,type);
+
+      /* نسخة محلية للفتح السريع على نفس الجهاز — فشلها لا يمنع الحفظ السحابي. */
+      try{ await idbPutFile(id,blob); }catch(localErr){ console.warn('LOCAL_CACHE_WRITE_FAILED',localErr); }
+
+      const cloudPath=await uploadPortfolioBlobToCloud(id,f.name,type,blob);
+      if(!cloudPath) throw new Error(lastPortfolioCloudError||'تعذر رفع الملف إلى Supabase');
+
+      /* تحقق فعلي من أن المسار قابل للقراءة قبل تسجيل الملف في الميتاداتا. */
+      const verify=await signedPortfolioCloudUrl(cloudPath,120);
+      if(!verify) throw new Error('تم الرفع لكن تعذر التحقق من رابط العرض السحابي');
+
+      metas.push({
+        id,name:f.name,type,size:f.size||0,
+        storage:'idb',cloud_path:cloudPath,cloud_ready:true,
+        createdAt:now(),updatedAt:now()
+      });
       done++;
-      setUploadStatus(`جاري الحفظ: ${done} من ${incoming.length} — ${f.name}`);
+      setUploadStatus(`☁️ تم حفظ ${done} من ${incoming.length} سحابيًا — ${f.name}`);
     }catch(err){
-      console.error('UPLOAD_IDB_ERROR',err);
-      let msg=`تعذر حفظ «${f.name}» داخل تخزين Safari.`;
-      if(err&&err.name)msg+=` (${err.name})`;
-      setUploadStatus(msg+' سنستخدم Supabase Storage للملفات الكبيرة إذا استمرت المشكلة.',true);
-      toast(msg);
+      console.error('PORTFOLIO_FILE_SAVE_FAILED',err);
+      try{ await idbDeleteFile(id); }catch(e){}
+      failed.push({name:f.name,reason:cloudErrorText(err)||lastPortfolioCloudError||'تعذر الحفظ السحابي'});
     }
   }
+
   input.value='';
-  if(!metas.length)return;
-  if(ctx.kind==='root'){const a=getRootFiles(ctx.section||currentSection);a.unshift(...metas);saveRootFiles(a,ctx.section||currentSection);renderRootFiles()}
-  else{
-    const a=getFolderFiles(ctx.folderId,ctx.section||currentSection);
-    a.unshift(...metas);
-    saveFolderFiles(a,ctx.folderId,ctx.section||currentSection);
-    if(String(currentFolderId||'')===String(ctx.folderId||'')) refreshFolderView();
-    else renderFolders();
+
+  if(metas.length){
+    if(ctx.kind==='root'){
+      const section=ctx.section||currentSection;
+      const a=getRootFiles(section);a.unshift(...metas);saveRootFiles(a,section);
+      if(section===currentSection)renderRootFiles();
+    }else{
+      const section=ctx.section||currentSection;
+      const a=getFolderFiles(ctx.folderId,section);a.unshift(...metas);saveFolderFiles(a,ctx.folderId,section);
+      if(String(currentFolderId||'')===String(ctx.folderId||'') && section===currentSection)refreshFolderView();
+      else renderFolders();
+    }
+    try{ schedulePortfolioCloudSave(); }catch(e){}
   }
-  setUploadStatus(`✅ تم حفظ ${done} ملف${done===1?'':'ات'} بنجاح. سيظهر الآن داخل ${ctx.kind==='root'?'القسم':'المجلد'}.`);
-  toast(`تم حفظ ${done} ملف${done===1?'':'ات'} بنجاح`);
+
+  if(failed.length){
+    const detail=failed.slice(0,4).map(x=>`• ${x.name}: ${x.reason}`).join('\n');
+    setUploadStatus(`⚠️ تم حفظ ${done} سحابيًا، وتعذر ${failed.length}. افتحي «السحابة والحسابات» إذا أردتِ تفاصيل الاتصال.`,true);
+    alert(`تم حفظ ${done} ملف سحابيًا.\nتعذر حفظ ${failed.length} ملف، ولم تتم إضافته للملف حتى لا تتعطل المشاركة لاحقًا.\n\n${detail}`);
+  }else{
+    setUploadStatus(`✅ تم حفظ ${done} ملف${done===1?'':'ات'} سحابيًا بنجاح، وهو جاهز للمشاركة من أي جهاز.`,true);
+    toast(`✅ تم الحفظ السحابي: ${done} ملف${done===1?'':'ات'}`);
+  }
 }
 function addFilesFromFolderEditor(e){
   if(!editingFolderId){toast('احفظي المجلد أولًا ثم أضيفي الملفات');return}
@@ -2853,7 +2901,7 @@ async function ensurePortfolioFileCloudReady(file){
       const r=await fetch(file.data);
       blob=await r.blob();
     }
-    if(!blob) return {ok:false,reason:'يحتاج إعادة اختيار من الجهاز مرة واحدة'};
+    if(!blob) return {ok:false,reason:'لا توجد نسخة سحابية، والنسخة المحلية غير موجودة في هذا المتصفح. إذا كنتِ قد حذفتِ الملف وأعدتِ رفعه فاحذفي هذا السجل القديم فقط.'};
 
     const path=await uploadPortfolioBlobToCloud(
       file.id||('f_'+Date.now()),
@@ -3113,7 +3161,7 @@ async function prepareAllSectionsForShare(){
           if(before!==r.path)rootChanged=true;
           ready++;
         }else{
-          problems.push({sectionKey:sec.key,section:sec.label,folderId:'__ROOT__',folder:'',id:file.id,name:file.name||'ملف'});
+          problems.push({sectionKey:sec.key,section:sec.label,folderId:'__ROOT__',folder:'',id:file.id,name:file.name||'ملف',reason:r.reason||'غير جاهز سحابيًا'});
         }
       }
       if(rootChanged)saveRootFiles(roots,sec.key);
@@ -3131,7 +3179,7 @@ async function prepareAllSectionsForShare(){
             if(before!==r.path)changed=true;
             ready++;
           }else{
-            problems.push({sectionKey:sec.key,section:sec.label,folderId:String(folder.id),folder:folder.name||'مجلد',id:file.id,name:file.name||'ملف'});
+            problems.push({sectionKey:sec.key,section:sec.label,folderId:String(folder.id),folder:folder.name||'مجلد',id:file.id,name:file.name||'ملف',reason:r.reason||'غير جاهز سحابيًا'});
           }
         }
         if(changed)saveFolderFiles(files,folder.id,sec.key);
@@ -3146,7 +3194,7 @@ async function prepareAllSectionsForShare(){
       listBox.innerHTML=problems.map(p=>`
         <div class="survey-list-card">
           <b>${esc(p.name)}</b>
-          <div class="viewer-note">${esc(p.section)}${p.folder?' ← '+esc(p.folder):''}</div>
+          <div class="viewer-note">${esc(p.section)}${p.folder?' ← '+esc(p.folder):''}<br><small style="color:#8a3e32">${esc(p.reason||'')}</small></div>
           <div class="modal-actions">
             <button class="action secondary" type="button" onclick="repairOneShareFile('${p.sectionKey}','${p.folderId}','${p.id}')">🔄 ربط بالسحابة</button>
           </div>
@@ -3169,7 +3217,10 @@ async function preflightFullPortfolioFiles(){
     for(const file of roots){
       const r=await ensurePortfolioFileCloudReady(file);
       if(r.ok){
-        if(file.cloud_path===r.path) rootChanged=true;
+        const before=file.cloud_path||'';
+        file.cloud_path=r.path;
+        file.cloud_ready=true;
+        if(before!==r.path) rootChanged=true;
         prepared.push({file,folder:'',section:sec.label});
       }else{
         problems.push({name:file.name||'ملف',section:sec.label,reason:r.reason});
@@ -3185,6 +3236,8 @@ async function preflightFullPortfolioFiles(){
         const before=file.cloud_path||'';
         const r=await ensurePortfolioFileCloudReady(file);
         if(r.ok){
+          file.cloud_path=r.path;
+          file.cloud_ready=true;
           if((file.cloud_path||'')!==before) changed=true;
           prepared.push({file,folder:folder.name||'مجلد',section:sec.label});
         }else{
@@ -3199,11 +3252,15 @@ async function preflightFullPortfolioFiles(){
 }
 
 function shareProblemsHtml(problems){
-  const names=problems.slice(0,8).map(p=>`• ${esc(p.name)}${p.folder?` — ${esc(p.folder)}`:''}`).join('<br>');
+  const names=problems.slice(0,8).map(p=>{
+    const where=p.folder?` — ${esc(p.folder)}`:'';
+    const reason=p.reason?`<br><small style="color:#8a3e32">${esc(p.reason)}</small>`:'';
+    return `• ${esc(p.name)}${where}${reason}`;
+  }).join('<br>');
   const more=problems.length>8?`<br>… و${problems.length-8} ملف آخر`:'';
   return `<div class="us-err"><b>⛔ لم يتم إنشاء الرابط حتى لا يصلك رابط ناقص.</b><br>
-  هذه الملفات تحتاج إعادة ربط مرة واحدة من الجهاز/المتصفح الذي رُفعت منه:<br>${names}${more}<br>
-  <small>بعد إعادة اختيارها من زر «مستند / ملف» ستُحفظ سحابيًا وتعمل المشاركة من أي جهاز.</small></div>`;
+  يوجد سجل ملف غير جاهز سحابيًا:<br>${names}${more}<br>
+  <small>الملفات الجديدة من هذه النسخة لا تُضاف أصلًا إلا بعد نجاح حفظها سحابيًا.</small></div>`;
 }
 
 async function fpUploadStoredFile(file, session, token, shareId, days, folderName, sectionLabel){
@@ -4213,5 +4270,7 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
   <div id="allSharePrepStatus"></div>
   <div id="allSharePrepProblems"></div>
 </div></div>
+
+<!-- v26 cloud-first file integrity fix: new uploads are committed only after Supabase upload + signed-read verification -->
 </body>
 </html>
