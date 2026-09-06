@@ -6,6 +6,7 @@
 <link rel="apple-touch-icon" href="145B5362-D3F2-4B6C-8F20-1C956385604D.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 
 <script>
 async function applySupabaseRole(){
@@ -4729,6 +4730,66 @@ submitGuestReview=async function(){
  const status=document.getElementById('guestReviewStatus'); if(status)status.value='approved';
  return _v30Submit.apply(this,arguments);
 };
+</script>
+
+<style id="pdf-direct-approval-v31-style">
+#guestReviewStatusWrap{display:none!important}
+.approved-notice{border:1px solid #b8d8c8;background:#f2faf6;border-radius:14px;padding:12px;margin:10px 0}
+.approved-notice b{color:#075b45}.approved-notice button{margin-top:8px}
+</style>
+<script id="pdf-direct-approval-v31-script">
+/* v31: stamp/sign the selected PDF itself and return that approved PDF in the approval response. */
+function v31DataUrlToBytes(dataUrl){const b64=String(dataUrl||'').split(',')[1]||'';const bin=atob(b64);const out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out}
+function v31BytesToDataUrl(bytes){let bin='';const step=0x8000;for(let i=0;i<bytes.length;i+=step)bin+=String.fromCharCode.apply(null,bytes.subarray(i,Math.min(i+step,bytes.length)));return 'data:application/pdf;base64,'+btoa(bin)}
+function v31ApprovalLabel(name){const c=document.createElement('canvas');c.width=900;c.height=210;const x=c.getContext('2d');x.fillStyle='rgba(255,255,255,.94)';x.fillRect(0,0,c.width,c.height);x.strokeStyle='#0b6b50';x.lineWidth=5;x.strokeRect(5,5,c.width-10,c.height-10);x.fillStyle='#075b45';x.textAlign='center';x.direction='rtl';x.font='bold 54px Arial';x.fillText('معتمد وموقّع إلكترونيًا',450,72);x.font='34px Arial';x.fillText('المعتمدة: '+name,450,128);x.font='28px Arial';x.fillText(new Date().toLocaleString('ar-SA'),450,174);return c.toDataURL('image/png')}
+async function v31MakeApprovedPdf(url,signature,stamp,name){
+ if(!window.PDFLib)throw new Error('تعذر تحميل أداة اعتماد PDF. أعيدي فتح الصفحة وحاولي مرة أخرى.');
+ const res=await fetch(url);if(!res.ok)throw new Error('تعذر فتح ملف PDF للاعتماد.');
+ const bytes=new Uint8Array(await res.arrayBuffer());const pdf=await PDFLib.PDFDocument.load(bytes,{ignoreEncryption:true});
+ const pages=pdf.getPages();if(!pages.length)throw new Error('ملف PDF لا يحتوي صفحات.');const page=pages[pages.length-1];const {width,height}=page.getSize();
+ const label=await pdf.embedPng(v31DataUrlToBytes(v31ApprovalLabel(name)));const lw=Math.min(width*.48,280),lh=lw*(210/900);page.drawImage(label,{x:width-lw-24,y:24,width:lw,height:lh});
+ if(signature){const im=await pdf.embedPng(v31DataUrlToBytes(signature));const w=Math.min(width*.28,160),h=Math.min(70,w*.42);page.drawImage(im,{x:24,y:30,width:w,height:h});}
+ if(stamp&&String(stamp).startsWith('data:image/')){let im;try{im=String(stamp).includes('image/jpeg')?await pdf.embedJpg(v31DataUrlToBytes(stamp)):await pdf.embedPng(v31DataUrlToBytes(stamp));}catch(e){}if(im){const w=Math.min(width*.18,100);page.drawImage(im,{x:width-w-28,y:lh+42,width:w,height:w});}}
+ return await pdf.save();
+}
+async function v31StampFileData(){const inp=document.getElementById('guestReviewStamp');const f=inp?.files?.[0];if(!f)return null;return await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f)})}
+submitGuestReview=async function(){
+ if(sharedViewRole!=='admin')return _v30Submit.apply(this,arguments);
+ const msg=document.getElementById('guestReviewMessage');try{
+  if(!approvalTarget)throw new Error('اختاري الملف المراد اعتماده أولًا.');
+  if(approvalTarget.kind!=='file')throw new Error('للتوقيع والختم على المستند نفسه اختاري ملف PDF محددًا.');
+  if(!/\.pdf$/i.test(approvalTarget.file||''))throw new Error('الاعتماد المباشر على المستند متاح حاليًا لملفات PDF.');
+  const name=document.getElementById('guestReviewName').value.trim();if(!name)throw new Error('اكتبي اسم المديرة / المشرفة.');
+  const note=document.getElementById('guestReviewNote').value.trim();
+  const sigCanvas=document.getElementById('guestReviewSignature');const signature=sigCanvas?.toDataURL('image/png')||null;
+  const stamp=await v31StampFileData();msg.innerHTML='<div class="us-ok">جاري وضع التوقيع والختم على ملف PDF نفسه…</div>';
+  const approvedBytes=await v31MakeApprovedPdf(approvalTarget.url,signature,stamp,name);const approvedPdf=v31BytesToDataUrl(approvedBytes);
+  const payload={kind:'approved_pdf_v1',file_name:approvalTarget.file,section:approvalTarget.section,folder:approvalTarget.folder||'',approved_pdf:approvedPdf,stamp:stamp||null};
+  const target=`[تم اعتماد ملف PDF نفسه | القسم: ${approvalTarget.section} | الملف: ${approvalTarget.file}]`;
+  const {error}=await sb.rpc('submit_share_response',{p_token:sharedPortfolioToken,p_type:'approval',p_name:name,p_status:'approved',p_note:target+(note?'\n'+note:''),p_signature:signature,p_stamp:JSON.stringify(payload)});if(error)throw error;
+  msg.innerHTML='<div class="us-ok">✅ تم وضع التوقيع'+(stamp?' والختم':'')+' على ملف PDF نفسه وإرسال النسخة المعتمدة للمعلمة.</div>';
+ }catch(e){console.error(e);msg.innerHTML='<div class="us-err">❌ '+esc(e.message||'تعذر اعتماد الملف')+'</div>'}
+};
+const _v31ChooseTarget=v29ChooseTarget;
+v29ChooseTarget=function(kind,secLabel,fileName,folderName,url){
+ if(kind==='section'){toast('اختاري ملف PDF داخل القسم ليتم وضع التوقيع والختم على المستند نفسه.');return;}
+ _v31ChooseTarget(kind,secLabel,fileName,folderName,url);
+ const help=document.getElementById('guestReviewHelp');if(help){const selected=help.querySelector('.approval-selected')?.outerHTML||'';help.innerHTML=selected+`<button class="mini" type="button" onclick="v29OpenFile(approvalTarget.url)">👁️ عرض الملف قبل الاعتماد</button><div class="viewer-note" style="margin-top:8px">بعد المراجعة وقّعي بإصبعك داخل مربع التوقيع. ويمكن إضافة صورة الختم. عند الإرسال سيُوضع التوقيع والختم على صفحة ملف PDF نفسه وتعود نسخة معتمدة للمعلمة.</div>`;}
+ const btn=document.querySelector('#guestReviewModal .modal-actions .action');if(btn)btn.textContent='✅ توقيع وختم الملف وإرساله';
+};
+openApprovals=async function(){
+ try{const feed=$('approvalFeed');if(feed)feed.innerHTML='<div class="empty-state">جاري تحميل التنبيهات…</div>';const h=document.querySelector('#approvalModal h3');if(h)h.textContent='🔔 الاهتمام والتنبيهات';openModal('approvalModal');
+ const {data:{session}}=await sb.auth.getSession();if(!session){feed.innerHTML='<div class="empty-state">يلزم تسجيل دخول المعلمة.</div>';return}
+ const {data:links,error:le}=await sb.from('share_links').select('id,title,section_key').eq('owner_id',session.user.id);if(le)throw le;const ids=(links||[]).map(x=>x.id);if(!ids.length){feed.innerHTML='<div class="empty-state">لا توجد تنبيهات اعتماد.</div>';return}
+ const {data:rs,error:re}=await sb.from('share_responses').select('*').in('share_id',ids).eq('response_type','approval').order('created_at',{ascending:false});if(re)throw re;
+ const fresh=(rs||[]).map(r=>{try{const p=JSON.parse(r.stamp_data||'');return p?.kind==='approved_pdf_v1'?{r,p}:null}catch(e){return null}}).filter(Boolean);
+ if(!fresh.length){feed.innerHTML='<div class="empty-state">لا توجد ملفات معتمدة بالنظام الجديد بعد.</div>';return}
+ feed.innerHTML=fresh.map(({r,p})=>`<div class="approved-notice"><b>✅ تم اعتماد ملف: «${esc(p.file_name)}»</b><br>القسم: ${esc(p.section)}<br>المعتمدة: ${esc(r.responder_name||'الإدارة')}<br><small>${new Date(r.created_at).toLocaleString('ar-SA')}</small><br><button class="action" type="button" onclick='v31OpenApprovedPdf(${JSON.stringify(p.approved_pdf)})'>📄 فتح ملف PDF المعتمد</button></div>`).join('');
+ }catch(e){console.error(e);const feed=$('approvalFeed');if(feed)feed.innerHTML='<div class="empty-state">تعذر تحميل التنبيهات الآن.</div>'}
+};
+function v31OpenApprovedPdf(dataUrl){const a=document.createElement('a');a.href=dataUrl;a.target='_blank';a.rel='noopener';a.click()}
+/* rename teacher card to the requested attention/notification area and hide legacy approval records */
+document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.special-card').forEach(c=>{if((c.textContent||'').includes('الاعتمادات والتوقيعات المستلمة')){const b=c.querySelector('b');if(b)b.textContent='🔔 الاهتمام والتنبيهات';const sp=c.querySelector('span');if(sp)sp.textContent='إشعار باسم الملف والقسم عند وصول اعتماد جديد';}})});
 </script>
 </body>
 </html>
