@@ -2874,6 +2874,159 @@ async function repairOneShareFile(sectionKey,folderId,fileId){
   }catch(e){}
 }
 
+
+function normalizePortfolioFileName(name){
+  return String(name||'')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g,' ')
+    .replace(/[ـ]/g,'')
+    .replace(/[أإآ]/g,'ا')
+    .replace(/ى/g,'ي')
+    .replace(/ة/g,'ه');
+}
+
+function allPortfolioFileRefs(){
+  const refs=[];
+  for(const sec of fpAllSections()){
+    const roots=getRootFiles(sec.key)||[];
+    roots.forEach((file,index)=>refs.push({
+      kind:'root',sectionKey:sec.key,section:sec.label,folderId:'__ROOT__',folder:'',file,index,files:roots
+    }));
+
+    for(const folder of getFolders(sec.key)||[]){
+      const files=getFolderFiles(folder.id,sec.key)||[];
+      files.forEach((file,index)=>refs.push({
+        kind:'folder',sectionKey:sec.key,section:sec.label,folderId:String(folder.id),folder:folder.name||'مجلد',file,index,files
+      }));
+    }
+  }
+  return refs;
+}
+
+async function bulkRelinkOldFiles(){
+  const input=document.getElementById('bulkRelinkInput');
+  const btn=document.getElementById('bulkRelinkBtn');
+  const status=document.getElementById('bulkRelinkStatus');
+  const selected=[...(input.files||[])];
+
+  if(!selected.length){
+    status.innerHTML='<div class="us-err">اختاري الملفات القديمة أولًا.</div>';
+    return;
+  }
+
+  btn.disabled=true;
+  btn.textContent='جاري الربط…';
+  status.innerHTML='<div class="us-ok">⏳ جاري مطابقة الملفات مع الأقسام والمجلدات…</div>';
+
+  try{
+    const refs=allPortfolioFileRefs();
+    const byName=new Map();
+
+    for(const ref of refs){
+      const key=normalizePortfolioFileName(ref.file?.name);
+      if(!key)continue;
+      if(!byName.has(key))byName.set(key,[]);
+      byName.get(key).push(ref);
+    }
+
+    let matched=0,linked=0;
+    const notFound=[];
+    const failed=[];
+    const touchedRoots=new Set();
+    const touchedFolders=new Set();
+
+    for(let i=0;i<selected.length;i++){
+      const picked=selected[i];
+      status.innerHTML=`<div class="us-ok">⏳ ${i+1} من ${selected.length}: ${esc(picked.name)}</div>`;
+
+      const key=normalizePortfolioFileName(picked.name);
+      const targets=byName.get(key)||[];
+
+      if(!targets.length){
+        notFound.push(picked.name);
+        continue;
+      }
+
+      matched += targets.length;
+
+      for(const ref of targets){
+        try{
+          // احفظ النسخة المختارة محليًا بنفس معرف الملف القديم إن أمكن
+          const blob=picked.slice(0,picked.size,picked.type||'application/octet-stream');
+          const fileId=ref.file.id || ('f_'+Date.now()+'_'+Math.random().toString(36).slice(2,8));
+          ref.file.id=fileId;
+          ref.file.name=picked.name;
+          ref.file.type=picked.type||ref.file.type||'application/octet-stream';
+          ref.file.size=picked.size||0;
+          ref.file.storage='idb';
+          ref.file.updatedAt=Date.now();
+
+          await idbPutFile(fileId,blob);
+
+          const {data:{session}}=await sb.auth.getSession();
+          if(!session)throw new Error('يلزم تسجيل الدخول');
+
+          const cloudPath=`${session.user.id}/portfolio/${fileId}_${usSafeName(picked.name)}`;
+          const {error:upErr}=await sb.storage.from('shared-artifacts').upload(cloudPath,blob,{
+            contentType:ref.file.type,
+            upsert:true
+          });
+          if(upErr)throw upErr;
+
+          ref.file.cloud_path=cloudPath;
+          ref.file.cloud_ready=true;
+          linked++;
+
+          if(ref.kind==='root'){
+            touchedRoots.add(ref.sectionKey);
+          }else{
+            touchedFolders.add(ref.sectionKey+'|||'+ref.folderId);
+          }
+        }catch(e){
+          console.warn('bulkRelinkOldFiles',e);
+          failed.push(picked.name);
+        }
+      }
+    }
+
+    // احفظ الميتاداتا بعد تحديث المسارات
+    for(const sectionKey of touchedRoots){
+      const rootRefs=refs.filter(r=>r.kind==='root' && r.sectionKey===sectionKey);
+      if(rootRefs.length) saveRootFiles(rootRefs[0].files,sectionKey);
+    }
+
+    for(const key of touchedFolders){
+      const [sectionKey,folderId]=key.split('|||');
+      const folderRefs=refs.filter(r=>r.kind==='folder' && r.sectionKey===sectionKey && String(r.folderId)===String(folderId));
+      if(folderRefs.length) saveFolderFiles(folderRefs[0].files,folderId,sectionKey);
+    }
+
+    if(typeof schedulePortfolioCloudSave==='function') schedulePortfolioCloudSave();
+
+    let html=`<div class="us-ok">✅ تم ربط ${linked} ملف داخل ملف الإنجاز.</div>`;
+    if(notFound.length){
+      html+=`<div class="us-err" style="margin-top:8px">لم أجد مطابقة لهذه الملفات:<br>${notFound.slice(0,10).map(n=>'• '+esc(n)).join('<br>')}</div>`;
+    }
+    if(failed.length){
+      html+=`<div class="us-err" style="margin-top:8px">تعذر ربط ${failed.length} ملف. أعيدي اختيارها مرة أخرى.</div>`;
+    }
+
+    status.innerHTML=html;
+    input.value='';
+
+    // اعرض نتيجة الفحص النهائية مباشرة
+    setTimeout(()=>prepareAllSectionsForShare(),500);
+
+  }catch(e){
+    console.error(e);
+    status.innerHTML='<div class="us-err">❌ تعذر إكمال الربط الجماعي.</div>';
+  }finally{
+    btn.disabled=false;
+    btn.textContent='ربط الملفات المختارة';
+  }
+}
+
 async function prepareAllSectionsForShare(){
   const btn=document.getElementById('allSharePrepBtn');
   const status=document.getElementById('allSharePrepStatus');
@@ -3982,6 +4135,20 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
   </div>
   <div class="modal-actions">
     <button id="allSharePrepBtn" class="action" type="button" onclick="prepareAllSectionsForShare()">بدء التجهيز</button>
+  </div>
+
+  <div class="section-block" style="margin-top:14px">
+    <h3 style="margin-top:0">📎 ربط الملفات القديمة دفعة واحدة</h3>
+    <div class="viewer-note">
+      اختاري الملفات القديمة من الجوال دفعة واحدة. سيطابقها التطبيق مع الملفات الموجودة داخل الأقسام والمجلدات بالاسم ويربطها بالسحابة تلقائيًا.
+    </div>
+    <div class="field" style="margin-top:10px">
+      <input id="bulkRelinkInput" type="file" multiple>
+    </div>
+    <div class="modal-actions">
+      <button id="bulkRelinkBtn" class="action secondary" type="button" onclick="bulkRelinkOldFiles()">ربط الملفات المختارة</button>
+    </div>
+    <div id="bulkRelinkStatus"></div>
   </div>
   <div id="allSharePrepStatus"></div>
   <div id="allSharePrepProblems"></div>
