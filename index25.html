@@ -4344,5 +4344,198 @@ async function submitGuestReview(){const msg=document.getElementById('guestRevie
 openApprovals=async function(){try{if($('approvalScopeNote'))$('approvalScopeNote').textContent='الاعتمادات والتوقيعات المرسلة من روابط الإدارة تظهر هنا.';const feed=$('approvalFeed');if(feed)feed.innerHTML='<div class="empty-state">جاري تحميل الاعتمادات…</div>';openModal('approvalModal');const {data:{session}}=await sb.auth.getSession();if(!session){if(feed)feed.innerHTML='<div class="empty-state">يلزم تسجيل دخول المعلمة لعرض الاعتمادات.</div>';return}const {data:links,error:le}=await sb.from('share_links').select('id,title,section_key,created_at').eq('owner_id',session.user.id).order('created_at',{ascending:false});if(le)throw le;const ids=(links||[]).map(x=>x.id);if(!ids.length){if(feed)feed.innerHTML='<div class="empty-state">لا توجد اعتمادات مستلمة بعد.</div>';return}const {data:rs,error:re}=await sb.from('share_responses').select('*').in('share_id',ids).eq('response_type','approval').order('created_at',{ascending:false});if(re)throw re;const byId=Object.fromEntries((links||[]).map(x=>[x.id,x]));if(!feed)return;if(!(rs||[]).length){feed.innerHTML='<div class="empty-state">لا توجد اعتمادات مستلمة بعد.</div>';return}feed.innerHTML=(rs||[]).map(function(r){const l=byId[r.share_id]||{};let h='<div class="feed-item"><span class="tag">'+esc(l.title||l.section_key||'ملف الإنجاز')+'</span> <strong>'+esc(r.responder_name||'الإدارة')+'</strong> <span class="tag">'+esc(r.status||'تمت المراجعة')+'</span>';if(r.note)h+='<p>'+esc(r.note)+'</p>';if(r.signature_data)h+='<div><small>التوقيع</small><br><img src="'+r.signature_data+'" style="max-width:220px;max-height:90px;object-fit:contain"></div>';if(r.stamp_data)h+='<div><small>الختم</small><br><img src="'+r.stamp_data+'" style="max-width:160px;max-height:100px;object-fit:contain"></div>';h+='<small>'+new Date(r.created_at).toLocaleString('ar-SA')+'</small></div>';return h}).join('')}catch(e){console.error(e);const feed=$('approvalFeed');if(feed)feed.innerHTML='<div class="empty-state">تعذر تحميل الاعتمادات الآن.</div>'}}
 window.addEventListener('DOMContentLoaded',()=>{if(sharedPortfolioToken)setTimeout(configureSharedPortfolioUI,350)});
 </script>
+
+<style id="community-clean-v27">
+/* تنظيف واجهة التفاعل: لا نماذج إدخال يدوية للاعتماد/التوصيات داخل حساب المعلمة */
+#approvalModal .form-grid,
+#approvalModal .modal-actions button:not(:first-child),
+#recommendModal .form-grid,
+#recommendModal .modal-actions button:not(:first-child){display:none!important}
+</style>
+<script id="community-clean-v27-script">
+/* ===== v27: توحيد تفاعل المجتمع المدرسي + مشاركة المحتوى من السحابة نفسها ===== */
+async function v27SignedSnapshotFile(file,days,folderName=''){
+  const ready=await ensurePortfolioFileCloudReady(file);
+  if(!ready.ok) throw new Error((file?.name||'ملف')+': '+(ready.reason||'غير جاهز سحابيًا'));
+  const {data,error}=await sb.storage.from('shared-artifacts').createSignedUrl(ready.path,days*86400);
+  if(error||!data?.signedUrl) throw new Error((file?.name||'ملف')+': تعذر إنشاء رابط العرض');
+  return {file_name:file?.name||'ملف',mime_type:file?.type||'application/octet-stream',public_url:data.signedUrl,folder_name:folderName||null};
+}
+
+unifiedCreateShare=async function(){
+  usStatus('');
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session) throw new Error('يلزم تسجيل دخول المعلمة بحساب Microsoft أولًا.');
+    const sectionDisplay=document.getElementById('usSection').value;
+    const sectionKey=usSectionKeyFromDisplay(sectionDisplay);
+    const role=document.getElementById('usRole').value;
+    const days=Number(document.getElementById('usDays').value||7);
+    const note=document.getElementById('usNote').value.trim();
+    const sectionText=localStorage.getItem(NS+'text_'+sectionKey)||'';
+    const portfolioFiles=[];
+    if(usSelectedPortfolioFiles.length){
+      usSelectedPortfolioFiles.forEach(item=>portfolioFiles.push(item));
+    }else{
+      getRootFiles(sectionKey).forEach(f=>portfolioFiles.push({file:f,folder:''}));
+      getFolders(sectionKey).forEach(folder=>getFolderFiles(folder.id,sectionKey).forEach(f=>portfolioFiles.push({file:f,folder:folder.name||''})));
+    }
+    usStatus('⏳ جاري تجهيز نفس الملفات الموجودة للمشاركة…');
+    const snapshotFiles=[];
+    for(let i=0;i<portfolioFiles.length;i++){
+      const item=portfolioFiles[i];
+      snapshotFiles.push(await v27SignedSnapshotFile(item.file,days,item.folder||''));
+    }
+    const {data,error}=await sb.rpc('create_share_link',{
+      p_role:role,p_section:sectionKey,p_title:sectionDisplay,
+      p_snapshot:{section:sectionKey,title:sectionDisplay,text:sectionText,note,files:snapshotFiles},
+      p_days:days
+    });
+    if(error)throw error;
+    usShareUrl=`${location.origin}${location.pathname}?share=${encodeURIComponent(data.token)}`;
+    document.getElementById('usUrl').textContent=usShareUrl;
+    document.getElementById('usUrl')?.classList.remove('hidden');
+    document.getElementById('usCopyBtn')?.classList.remove('hidden');
+    document.getElementById('usSendBtn')?.classList.remove('hidden');
+    const qr=document.getElementById('usQr');if(qr){qr.innerHTML='';if(window.QRCode)new QRCode(qr,{text:usShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});}
+    usStatus(`✅ جاهز. تم ربط ${snapshotFiles.length} ملف من الموجود أصلًا، بدون إعادة رفع.`);
+  }catch(e){console.error(e);usStatus('❌ '+esc(e.message||'تعذر إنشاء المشاركة'),true)}
+}
+
+handleShareGuestLink=async function(){
+  const token=new URLSearchParams(location.search).get('share');
+  if(!token)return;
+  try{
+    document.body.classList.remove('cover-open');
+    $('cover').style.display='none';$('portfolio').style.display='none';
+    $('shareGuest').classList.add('active');
+    $('guestShareTitle').textContent='جاري فتح المشاركة...';
+    const data=await resolveGuestShare(token);
+    currentGuestShare={...data,token};
+    $('guestRoleBadge').textContent=data.role==='admin'?'🏫 الإدارة / المشرفة — مراجعة واعتماد':'👨‍👩‍👧 الأسرة / الزائرة — مشاهدة ورأي';
+    $('guestShareTitle').textContent=data.title||'ملف للمراجعة';
+    $('guestShareMeta').textContent=`القسم: ${data.section||''} • صلاحية الرابط حتى ${new Date(data.expires_at).toLocaleString('ar-SA')}`;
+    $('guestShareText').textContent=data.snapshot?.text||data.snapshot?.note||'لا يوجد نص مرفق.';
+    const files=(data.items&&data.items.length)?data.items:(data.snapshot?.files||[]);
+    $('guestShareFiles').innerHTML=files.length?files.map(f=>`<div class="share-file"><span>${f.folder_name?'<small>'+esc(f.folder_name)+'</small><br>':''}<b>${esc(f.file_name||'ملف')}</b></span><a href="${esc(f.public_url)}" target="_blank" rel="noopener">👁️ عرض الملف</a></div>`).join(''):'<div class="empty-state">لا توجد ملفات في هذه المشاركة.</div>';
+    $('guestAdminForm').classList.toggle('hidden',data.role!=='admin');
+    $('guestFamilyForm').classList.toggle('hidden',data.role!=='family');
+    if(data.role==='admin')setupSignatureCanvas();
+  }catch(err){console.error(err);$('guestShareTitle').textContent='الرابط غير متاح';$('guestShareMeta').textContent='قد يكون الرابط منتهيًا أو ملغيًا.';$('guestShareText').textContent='';$('guestShareFiles').innerHTML='';}
+}
+
+createFullPortfolioShare=async function(){
+  const status=document.getElementById('fpsStatus');
+  const btn=document.getElementById('fpsCreateBtn');
+  status.innerHTML='<div class="us-ok">⏳ جاري ربط محتوى ملف الإنجاز الموجود بالسحابة…</div>';
+  document.getElementById('fpsShareBox').classList.add('hidden');
+  if(btn){btn.disabled=true;btn.textContent='جاري التجهيز…'}
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session)throw new Error('يلزم تسجيل دخول المعلمة بحساب Microsoft أولًا.');
+    const role=document.getElementById('fpsRole').value;
+    const days=Number(document.getElementById('fpsDays').value||7);
+    const note=document.getElementById('fpsNote').value.trim();
+    const collected=await fpCollectSnapshot();
+    const refs=allPortfolioFileRefs();
+    const snapshotFiles=[];
+    for(let i=0;i<refs.length;i++){
+      const item=refs[i];
+      status.innerHTML=`<div class="us-ok">⏳ ربط الملف ${i+1} من ${refs.length}…</div>`;
+      const joined=[item.section,item.folder].filter(Boolean).join(' / ');
+      snapshotFiles.push(await v27SignedSnapshotFile(item.file,days,joined));
+    }
+    const rpcRole=role==='viewer'?'family':role;
+    const {data,error}=await sb.rpc('create_share_link',{
+      p_role:rpcRole,p_section:'__FULL_PORTFOLIO__',p_title:'ملف الإنجاز المهني كامل',
+      p_snapshot:{full_portfolio:true,viewer_role:role,note,aliases:collected.aliases,sections:collected.sections,files:snapshotFiles},
+      p_days:days
+    });
+    if(error)throw error;
+    fullPortfolioShareUrl=`${location.origin}${location.pathname}?portfolio_share=${encodeURIComponent(data.token)}`;
+    document.getElementById('fpsUrl').textContent=fullPortfolioShareUrl;
+    document.getElementById('fpsShareBox').classList.remove('hidden');
+    const qr=document.getElementById('fpsQr');if(qr){qr.innerHTML='';if(window.QRCode)new QRCode(qr,{text:fullPortfolioShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});}
+    status.innerHTML=`<div class="us-ok">✅ جاهز. الأقسام ومحتواها و${snapshotFiles.length} ملف مرتبطة بالرابط نفسه.</div>`;
+    if(btn){btn.disabled=false;btn.textContent='إنشاء رابط جديد'}
+  }catch(e){console.error(e);status.innerHTML=`<div class="us-err">❌ ${esc(e.message||'تعذر إنشاء الرابط')}</div>`;if(btn){btn.disabled=false;btn.textContent='إعادة المحاولة'}}
+}
+
+loadFullPortfolioPublic=async function(){
+  const token=sharedPortfolioToken;if(!token)return;
+  try{
+    const {data,error}=await sb.rpc('resolve_share_link_v2',{p_token:token});
+    if(error)throw error;
+    if(!data?.valid||!data.snapshot?.full_portfolio)throw new Error('الرابط غير صالح أو انتهت مدته.');
+    if((!data.items||!data.items.length)&&Array.isArray(data.snapshot?.files))data.items=data.snapshot.files;
+    fullPortfolioPublicData=data;
+    sharedViewRole=data.snapshot?.viewer_role==='admin'?'admin':'family';
+    document.body.classList.add('public-view');document.body.classList.remove('cover-open');
+    document.getElementById('cover').style.display='none';document.getElementById('portfolio').style.display='none';
+    document.getElementById('fullPortfolioPublicPage')?.classList.add('active');
+    document.getElementById('fppClosed')?.classList.add('hidden');document.getElementById('fppContent')?.classList.remove('hidden');
+    fpRenderPublic(data);configureSharedPortfolioUI();window.scrollTo(0,0);
+  }catch(e){console.error(e);document.getElementById('cover').style.display='none';document.getElementById('portfolio').style.display='none';document.getElementById('fullPortfolioPublicPage')?.classList.add('active');document.getElementById('fppClosed')?.classList.remove('hidden');document.getElementById('fppContent')?.classList.add('hidden')}
+}
+
+openRecommendations=async function(){
+  const feed=$('recommendFeed');
+  try{
+    const modal=document.getElementById('recommendModal');
+    const h=modal?.querySelector('h3');if(h)h.textContent='💬 الآراء والتوصيات المستلمة';
+    if(feed)feed.innerHTML='<div class="empty-state">جاري تحميل الآراء والتوصيات…</div>';
+    openModal('recommendModal');
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session){if(feed)feed.innerHTML='<div class="empty-state">يلزم تسجيل دخول المعلمة لعرض المشاركات.</div>';return}
+    const {data:links,error:le}=await sb.from('share_links').select('*').eq('owner_id',session.user.id).order('created_at',{ascending:false});
+    if(le)throw le;
+    const normal=(links||[]).filter(l=>l?.snapshot?.type!=='family_photo_wall');
+    const ids=normal.map(l=>l.id);
+    if(!ids.length){feed.innerHTML='<div class="empty-state">لا توجد آراء أو توصيات مستلمة بعد.</div>';return}
+    const {data:rs,error:re}=await sb.from('share_responses').select('*').in('share_id',ids).eq('response_type','recommendation').order('created_at',{ascending:false});
+    if(re)throw re;
+    const byId=Object.fromEntries(normal.map(x=>[x.id,x]));
+    if(!(rs||[]).length){feed.innerHTML='<div class="empty-state">لا توجد آراء أو توصيات مستلمة بعد.</div>';return}
+    feed.innerHTML=(rs||[]).map(r=>{const l=byId[r.share_id]||{};return `<div class="feed-item"><span class="tag">${esc(l.title||l.section_key||'ملف الإنجاز')}</span><strong>${esc(r.responder_name||'زائرة')}</strong>${r.note?`<p>${esc(r.note)}</p>`:''}<small>${new Date(r.created_at).toLocaleString('ar-SA')}</small></div>`}).join('');
+  }catch(e){console.error(e);if(feed)feed.innerHTML='<div class="empty-state">تعذر تحميل الآراء الآن.</div>'}
+}
+
+openFamilyWallResponses=async function(){
+  const box=document.getElementById('fwResponsesList');
+  box.innerHTML='<div class="empty-state">جاري تحميل صور الأسر…</div>';openModal('familyWallResponsesModal');
+  try{
+    const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('يلزم تسجيل الدخول');
+    const folder=getFolder(currentFolderId,currentSection);
+    let saved=getJSON(familyWallKey(),null),shareId=saved?.share_id||null;
+    if(!shareId){
+      const {data:links,error}=await sb.from('share_links').select('*').eq('owner_id',session.user.id).eq('section_key',currentSection).order('created_at',{ascending:false});
+      if(error)throw error;
+      const hit=(links||[]).find(l=>l?.snapshot?.type==='family_photo_wall'&&String(l?.snapshot?.folder_id||'')===String(currentFolderId));
+      if(hit)shareId=hit.id;
+    }
+    if(!shareId){box.innerHTML='<div class="empty-state">لم يتم إنشاء حائط صور لهذا المجلد بعد.</div>';return}
+    const {data,error}=await sb.from('share_responses').select('*').eq('share_id',shareId).order('created_at',{ascending:false});
+    if(error)throw error;
+    const photos=(data||[]).filter(r=>r.stamp_data);
+    if(!photos.length){box.innerHTML='<div class="empty-state">لم تصل صور من الأسر بعد.</div>';return}
+    window._familyWallPhotos=photos;
+    box.innerHTML=photos.map((r,i)=>`<div class="survey-list-card"><b>${esc(r.responder_name||'أسرة')}</b><div class="viewer-note">${new Date(r.created_at).toLocaleString('ar-SA')}</div>${r.note?`<div style="margin:7px 0">${esc(r.note)}</div>`:''}<img src="${r.stamp_data}" style="width:100%;max-height:360px;object-fit:contain;border-radius:14px;background:#fff"><div class="modal-actions"><button class="action secondary" onclick="saveFamilyPhotoToFolder(${i})">＋ حفظ داخل المجلد</button></div></div>`).join('');
+  }catch(e){console.error(e);box.innerHTML='<div class="survey-alert">تعذر تحميل صور الأسر.</div>'}
+}
+
+function v27CleanHome(){
+  document.querySelectorAll('.specials .special-card').forEach(card=>{
+    const oc=card.getAttribute('onclick')||'';
+    if(oc.includes('openAllSharePrep')||oc.includes('unifiedShareOpen'))card.style.display='none';
+    if(oc.includes('fullPortfolioShareOpen')){
+      const b=card.querySelector('b'),s=card.querySelector('span');
+      if(b)b.textContent='🏫👨‍👩‍👧 مشاركة ملف الإنجاز كاملًا';
+      if(s)s.textContent='الإدارة: اعتماد وتوقيع • الأسرة: مشاهدة ورأي • نفس المحتوى الموجود';
+    }
+  });
+  const am=document.getElementById('approvalModal');if(am){const h=am.querySelector('h3');if(h)h.textContent='✅ الاعتمادات والتوقيعات المستلمة';}
+}
+window.addEventListener('DOMContentLoaded',()=>setTimeout(v27CleanHome,40));
+</script>
 </body>
 </html>
