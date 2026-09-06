@@ -1369,14 +1369,20 @@ async function uploadPortfolioBlobToCloud(id,name,type,blob){
   try{
     const {data:{session}}=await sb.auth.getSession();
     if(!session)return null;
-    const path=`${session.user.id}/portfolio/${id}_${usSafeName(name||'file')}`;
+
+    // مسار جديد وفريد في كل مرة حتى يعمل مع سياسة INSERT الحالية بدون UPDATE.
+    const path=`${session.user.id}/portfolio/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${id}_${usSafeName(name||'file')}`;
+
     const {error}=await sb.storage.from('shared-artifacts').upload(path,blob,{
       contentType:type||blob.type||'application/octet-stream',
-      upsert:true
+      upsert:false
     });
     if(error)throw error;
     return path;
-  }catch(e){console.warn('PORTFOLIO_FILE_CLOUD_UPLOAD',e);return null}
+  }catch(e){
+    console.warn('PORTFOLIO_FILE_CLOUD_UPLOAD',e);
+    return null;
+  }
 }
 
 async function signedPortfolioCloudUrl(path,seconds=3600){
@@ -2774,40 +2780,31 @@ async function ensurePortfolioFileCloudReady(file){
   if(!file) return {ok:false,reason:'ملف غير معروف'};
 
   try{
-    // إذا عنده مسار سحابي، نتأكد أنه صالح فعلاً
+    // إذا له مسار سحابي صالح، استخدمه كما هو.
     if(file.cloud_path){
       const {data,error}=await sb.storage.from('shared-artifacts').createSignedUrl(file.cloud_path,300);
       if(!error && data?.signedUrl) return {ok:true,path:file.cloud_path};
     }
 
-    // حاول أخذ النسخة المحلية الحقيقية
+    // احصل على النسخة المحلية.
     let blob=null;
     if(file.storage==='idb' && file.id) blob=await idbGetFile(file.id);
     if(!blob && file.data){
       const r=await fetch(file.data);
       blob=await r.blob();
     }
+    if(!blob) return {ok:false,reason:'يحتاج إعادة اختيار من الجهاز مرة واحدة'};
 
-    if(!blob){
-      return {ok:false,reason:'النسخة الأصلية غير موجودة في هذا المتصفح'};
-    }
-
-    const {data:{session}}=await sb.auth.getSession();
-    if(!session) return {ok:false,reason:'يلزم تسجيل دخول المعلمة'};
-
-    const name=file.name||'ملف';
-    const type=file.type||blob.type||'application/octet-stream';
-    const path=`${session.user.id}/portfolio/${file.id||('f_'+Date.now())}_${usSafeName(name)}`;
-
-    const {error:upErr}=await sb.storage.from('shared-artifacts').upload(path,blob,{
-      contentType:type,
-      upsert:true
-    });
-    if(upErr){
-      return {ok:false,reason:'تعذر حفظ النسخة السحابية'};
-    }
+    const path=await uploadPortfolioBlobToCloud(
+      file.id||('f_'+Date.now()),
+      file.name||'ملف',
+      file.type||blob.type||'application/octet-stream',
+      blob
+    );
+    if(!path) return {ok:false,reason:'تعذر حفظ النسخة السحابية'};
 
     file.cloud_path=path;
+    file.cloud_ready=true;
     return {ok:true,path};
   }catch(e){
     console.warn('ensurePortfolioFileCloudReady',e);
@@ -2967,12 +2964,8 @@ async function bulkRelinkOldFiles(){
           const {data:{session}}=await sb.auth.getSession();
           if(!session)throw new Error('يلزم تسجيل الدخول');
 
-          const cloudPath=`${session.user.id}/portfolio/${fileId}_${usSafeName(picked.name)}`;
-          const {error:upErr}=await sb.storage.from('shared-artifacts').upload(cloudPath,blob,{
-            contentType:ref.file.type,
-            upsert:true
-          });
-          if(upErr)throw upErr;
+          const cloudPath=await uploadPortfolioBlobToCloud(fileId,picked.name,ref.file.type,blob);
+          if(!cloudPath)throw new Error('تعذر الرفع السحابي');
 
           ref.file.cloud_path=cloudPath;
           ref.file.cloud_ready=true;
@@ -4140,7 +4133,7 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
   <div class="section-block" style="margin-top:14px">
     <h3 style="margin-top:0">📎 ربط الملفات القديمة دفعة واحدة</h3>
     <div class="viewer-note">
-      اختاري الملفات القديمة من الجوال دفعة واحدة. سيطابقها التطبيق مع الملفات الموجودة داخل الأقسام والمجلدات بالاسم ويربطها بالسحابة تلقائيًا.
+      اختاري الملفات القديمة دفعة واحدة. سيطابقها التطبيق مع الملفات الموجودة داخل جميع الأقسام والمجلدات، ثم يحفظ نسخة سحابية جديدة قابلة للمشاركة.
     </div>
     <div class="field" style="margin-top:10px">
       <input id="bulkRelinkInput" type="file" multiple>
