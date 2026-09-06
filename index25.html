@@ -543,6 +543,10 @@ body.cover-open{overflow:hidden}
 .school-env-card p{margin:0 0 12px;color:var(--muted);line-height:1.8}
 .school-env-card .action{min-width:220px}
 
+
+.file-cloud-ready{display:inline-block;margin-top:5px;padding:3px 8px;border-radius:999px;background:#e9f7ef;color:#176a43;font-size:10px}
+.file-cloud-pending{display:inline-block;margin-top:5px;padding:3px 8px;border-radius:999px;background:#fff3e8;color:#9a5b14;font-size:10px}
+
 </style>
 </head>
 <body class="cover-open">
@@ -611,6 +615,7 @@ body.cover-open{overflow:hidden}
     <button class="special-card admin-only manage-only" onclick="openApprovals()"><b>✅ اعتماد الإدارة</b><span>مراجعة • اعتماد • توقيع • ختم</span></button>
     <button class="special-card manage-only" onclick="openSurveys()"><b>📊 الاستبيانات والنتائج</b><span>إنشاء • نشر • رابط وباركود • نتائج ورسوم بيانية</span></button>
     <button class="special-card manage-only" onclick="cloudInfo()"><b>☁️ السحابة والحسابات</b><span>Supabase + Microsoft • مزامنة وصلاحيات بين الأجهزة</span></button>
+    <button class="special-card teacher-only manage-only" type="button" onclick="openAllSharePrep()"><b>☁️ تجهيز جميع الأقسام للمشاركة</b><span>فحص وربط كل الملفات والمجلدات مرة واحدة • جاهزة للإرسال من أي جهاز</span></button>
     <button class="special-card teacher-only manage-only" type="button" onclick="unifiedShareOpen()"><b>🔗 المشاركة بالباركود</b><span>الإدارة والأسرة • روابط خاصة • اعتماد وملاحظات</span></button>
     <button class="special-card teacher-only manage-only" type="button" onclick="openQuickInbox()"><b>📥 الوارد السريع</b><span>ملفات وصور مؤقتة • ثم نقلها للقسم أو المجلد المناسب</span></button>
     <button class="special-card full-share-wide teacher-only manage-only" type="button" onclick="fullPortfolioShareOpen()"><b>👁️ مشاركة ملف الإنجاز كامل للاطلاع</b><span>كل الأقسام والملفات • عرض فقط • رأي واعتماد بدون تعديل</span></button>
@@ -2839,6 +2844,108 @@ async function signedShareItemFromCloud(file,shareId,days,folderName=''){
   }
 }
 
+
+function openAllSharePrep(){
+  document.getElementById('allSharePrepStatus').innerHTML='';
+  document.getElementById('allSharePrepProblems').innerHTML='';
+  openModal('allSharePrepModal');
+}
+
+async function repairOneShareFile(sectionKey,folderId,fileId){
+  let files,save;
+  if(folderId==='__ROOT__'){
+    files=getRootFiles(sectionKey)||[];
+    save=()=>saveRootFiles(files,sectionKey);
+  }else{
+    files=getFolderFiles(folderId,sectionKey)||[];
+    save=()=>saveFolderFiles(files,folderId,sectionKey);
+  }
+  const file=files.find(f=>String(f.id)===String(fileId));
+  if(!file){toast('تعذر العثور على الملف');return}
+  const r=await ensurePortfolioFileCloudReady(file);
+  if(!r.ok){toast('هذا الملف يحتاج إعادة اختياره من الجهاز مرة واحدة');return}
+  file.cloud_path=r.path;
+  file.cloud_ready=true;
+  save();
+  toast('✅ أصبح الملف جاهزًا للمشاركة');
+  try{
+    if(folderId==='__ROOT__')renderRootFiles();
+    else if(String(currentFolderId)===String(folderId))refreshFolderView();
+  }catch(e){}
+}
+
+async function prepareAllSectionsForShare(){
+  const btn=document.getElementById('allSharePrepBtn');
+  const status=document.getElementById('allSharePrepStatus');
+  const listBox=document.getElementById('allSharePrepProblems');
+  btn.disabled=true; btn.textContent='جاري الفحص…';
+  status.innerHTML='<div class="us-ok">⏳ جاري فحص جميع الأقسام…</div>';
+  listBox.innerHTML='';
+
+  let total=0,ready=0;
+  const problems=[];
+
+  try{
+    for(const sec of fpAllSections()){
+      const roots=getRootFiles(sec.key)||[];
+      let rootChanged=false;
+
+      for(const file of roots){
+        total++;
+        status.innerHTML=`<div class="us-ok">⏳ ${total} — ${esc(file.name||'ملف')}</div>`;
+        const before=file.cloud_path||'';
+        const r=await ensurePortfolioFileCloudReady(file);
+        if(r.ok){
+          file.cloud_path=r.path; file.cloud_ready=true;
+          if(before!==r.path)rootChanged=true;
+          ready++;
+        }else{
+          problems.push({sectionKey:sec.key,section:sec.label,folderId:'__ROOT__',folder:'',id:file.id,name:file.name||'ملف'});
+        }
+      }
+      if(rootChanged)saveRootFiles(roots,sec.key);
+
+      for(const folder of getFolders(sec.key)||[]){
+        const files=getFolderFiles(folder.id,sec.key)||[];
+        let changed=false;
+        for(const file of files){
+          total++;
+          status.innerHTML=`<div class="us-ok">⏳ ${total} — ${esc(file.name||'ملف')}</div>`;
+          const before=file.cloud_path||'';
+          const r=await ensurePortfolioFileCloudReady(file);
+          if(r.ok){
+            file.cloud_path=r.path; file.cloud_ready=true;
+            if(before!==r.path)changed=true;
+            ready++;
+          }else{
+            problems.push({sectionKey:sec.key,section:sec.label,folderId:String(folder.id),folder:folder.name||'مجلد',id:file.id,name:file.name||'ملف'});
+          }
+        }
+        if(changed)saveFolderFiles(files,folder.id,sec.key);
+      }
+    }
+
+    if(!problems.length){
+      status.innerHTML=`<div class="us-ok">✅ تم تجهيز جميع المحتويات: ${ready} ملف جاهز للمشاركة.</div>`;
+      listBox.innerHTML='<div class="viewer-note">الملفات الجديدة ستُحفظ سحابيًا تلقائيًا، ومشاركة الأقسام أو الملف الكامل ستعمل من أي جهاز.</div>';
+    }else{
+      status.innerHTML=`<div class="us-err">⚠️ تم تجهيز ${ready} من ${total} ملف. بقي ${problems.length} ملف قديم يحتاج إعادة اختياره مرة واحدة فقط.</div>`;
+      listBox.innerHTML=problems.map(p=>`
+        <div class="survey-list-card">
+          <b>${esc(p.name)}</b>
+          <div class="viewer-note">${esc(p.section)}${p.folder?' ← '+esc(p.folder):''}</div>
+          <div class="modal-actions">
+            <button class="action secondary" type="button" onclick="repairOneShareFile('${p.sectionKey}','${p.folderId}','${p.id}')">🔄 ربط بالسحابة</button>
+          </div>
+        </div>`).join('');
+    }
+  }catch(e){
+    console.error(e);
+    status.innerHTML='<div class="us-err">❌ تعذر إكمال الفحص.</div>';
+  }finally{
+    btn.disabled=false; btn.textContent='إعادة فحص كل الأقسام';
+  }
+}
 async function preflightFullPortfolioFiles(){
   const problems=[];
   const prepared=[];
@@ -3382,7 +3489,7 @@ async function saveFamilyPhotoToFolder(i){
     await idbPutFile(id,blob);
     const name='صورة الأسرة_'+new Date(r.created_at).toLocaleDateString('ar-SA')+'.jpg';
     const cloudPath=await uploadPortfolioBlobToCloud(id,name,'image/jpeg',blob);
-    const meta={id,name,type:'image/jpeg',size:blob.size,storage:'idb',cloud_path:cloudPath||null,createdAt:now(),updatedAt:now()};
+    const meta={id,name,type:'image/jpeg',size:blob.size,storage:'idb',cloud_path:cloudPath||null,cloud_ready:!!cloudPath,createdAt:now(),updatedAt:now()};
     const a=getFolderFiles(currentFolderId,currentSection);
     a.unshift(meta);
     saveFolderFiles(a,currentFolderId,currentSection);
@@ -3863,6 +3970,21 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
   <div class="modal-actions">
     <button class="action" type="button" onclick="quickInboxConfirmMove()">نقل الآن</button>
   </div>
+</div></div>
+
+<div class="modal" id="allSharePrepModal"><div class="modal-card survey-pro-card">
+  <div class="modal-head">
+    <h3>☁️ تجهيز جميع الأقسام للمشاركة</h3>
+    <button class="back" type="button" onclick="closeModal('allSharePrepModal')">إغلاق</button>
+  </div>
+  <div class="viewer-note">
+    يفحص جميع الأقسام والمجلدات والملفات. أي ملف موجود على هذا الجهاز يتم ربطه بالسحابة تلقائيًا ليصبح جاهزًا للإرسال والاطلاع.
+  </div>
+  <div class="modal-actions">
+    <button id="allSharePrepBtn" class="action" type="button" onclick="prepareAllSectionsForShare()">بدء التجهيز</button>
+  </div>
+  <div id="allSharePrepStatus"></div>
+  <div id="allSharePrepProblems"></div>
 </div></div>
 </body>
 </html>
