@@ -5013,5 +5013,79 @@ document.addEventListener('DOMContentLoaded',()=>{
 const _v33OpenPortfolio=openPortfolio;
 openPortfolio=function(){const r=_v33OpenPortfolio.apply(this,arguments);setTimeout(()=>v33ProcessPendingApprovals(true).catch(console.error),1200);return r;};
 </script>
+
+<style id="v34-nav-fix">
+/* v34: رجوع واضح ومنع تعلق النوافذ على iPhone/iPad */
+.modal-card{position:relative}
+.v34-modal-back{display:inline-flex;align-items:center;gap:6px;margin:0 0 12px;border:1px solid var(--gold);border-radius:999px;background:#fff;color:var(--green);padding:9px 14px;font-weight:900;font-size:13px;cursor:pointer}
+.v34-modal-back:active{transform:scale(.98)}
+body.v34-busy .v34-modal-back,body.v34-busy .modal-actions button{pointer-events:none;opacity:.65}
+</style>
+<script id="v34-nav-fix-script">
+(function(){
+  function allOpenModals(){return Array.from(document.querySelectorAll('.modal.open'));}
+  window.v34CloseModal=function(id){
+    const m=document.getElementById(id);if(!m)return;
+    m.classList.remove('open');
+    // تنظيف أي عارض PDF حتى لا يبقى iframe حاجزًا للمس
+    if(id==='approvalPdfViewerModal'){
+      try{if(typeof v32ClosePdf==='function' && v32ClosePdf!==window.v34CloseModal)v32ClosePdf();}catch(e){}
+    }
+    document.body.classList.remove('v34-busy');
+  };
+  // اجعل الإغلاق القديم أكثر صلابة بدون تغيير بقية النظام
+  const oldClose=window.closeModal;
+  window.closeModal=function(id){
+    try{const m=document.getElementById(id);if(m)m.classList.remove('open');}catch(e){}
+    document.body.classList.remove('v34-busy');
+  };
+  const oldOpen=window.openModal;
+  window.openModal=function(id){
+    const m=document.getElementById(id);if(!m)return;
+    // لا نكدّس أكثر من نافذة فوق الأخرى إلا عارض الملف المقصود
+    allOpenModals().forEach(x=>{if(x.id!==id && id!=='approvalPdfViewerModal')x.classList.remove('open')});
+    m.classList.add('open');
+  };
+  window.v34UiBack=function(){
+    const opens=allOpenModals();
+    if(opens.length){window.closeModal(opens[opens.length-1].id);return;}
+    if(document.getElementById('folderView')?.classList.contains('active')){try{closeFolder();}catch(e){}return;}
+    if(document.getElementById('panel')?.classList.contains('active')){try{closePanel();}catch(e){}return;}
+    try{window.scrollTo({top:0,behavior:'auto'});}catch(e){window.scrollTo(0,0)}
+  };
+  function addBack(modalId,label){
+    const card=document.querySelector('#'+modalId+' .modal-card');if(!card||card.querySelector('.v34-modal-back'))return;
+    const b=document.createElement('button');b.type='button';b.className='v34-modal-back';b.textContent=label||'← العودة للصفحة';
+    b.addEventListener('click',()=>window.closeModal(modalId));
+    card.insertBefore(b,card.firstChild);
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    addBack('folderModal','← العودة للمجلد');
+    addBack('approvalModal','← العودة لصفحة ملف الإنجاز');
+    addBack('guestReviewModal','← العودة للملفات');
+    addBack('approvalTargetModal','← العودة للملفات');
+    addBack('approvalPdfViewerModal','← العودة للاعتماد');
+    // الضغط على المنطقة المعتمة يغلق النافذة بدل أن تبقى عالقة
+    document.querySelectorAll('.modal').forEach(m=>{
+      m.addEventListener('pointerdown',e=>{if(e.target===m)window.closeModal(m.id);},{passive:true});
+    });
+  });
+  // زر الرجوع في المتصفح: لا يخرج المستخدم فجأة؛ يرجعه طبقة واحدة داخل الملف
+  window.addEventListener('popstate',()=>{window.v34UiBack();});
+})();
+</script>
+
+<script id="v34-panel-fix">
+(function(){
+ const oldClosePanel=window.closePanel;
+ window.closePanel=function(){
+   try{document.querySelectorAll('.modal.open').forEach(m=>m.classList.remove('open'));}catch(e){}
+   try{if(document.getElementById('folderView')?.classList.contains('active'))closeFolder();}catch(e){}
+   try{oldClosePanel&&oldClosePanel();}catch(e){document.getElementById('panel')?.classList.remove('active');}
+   document.body.classList.remove('v34-busy');
+   try{window.scrollTo({top:0,behavior:'auto'});}catch(e){window.scrollTo(0,0)}
+ };
+})();
+</script>
 </body>
 </html>
