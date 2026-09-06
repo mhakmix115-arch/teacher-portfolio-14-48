@@ -4672,5 +4672,63 @@ submitGuestReview=async function(){
  }catch(e){console.error(e);msg.innerHTML='<div class="us-err">❌ '+esc(e.message||'تعذر الإرسال')+'</div>'}
 };
 </script>
+
+<style id="approval-final-v30-style">
+#guestReviewStatusWrap{display:none!important}
+#guestReviewModal .modal-actions .action{font-size:17px;font-weight:800}
+.approval-empty{padding:9px;border:1px dashed #dfc98f;border-radius:12px;color:#786b57;background:#fff}
+</style>
+<script id="approval-final-v30-script">
+/* Final approval flow: all 24 sections, one combined approval action. */
+function v30AllApprovalSections(){
+  const snap=fullPortfolioPublicData?.snapshot||{};
+  const snapSecs=Array.isArray(snap.sections)?snap.sections:[];
+  const sharedItems=Array.isArray(fullPortfolioPublicData?.items)?fullPortfolioPublicData.items:(Array.isArray(snap.files)?snap.files:[]);
+  const byKey=new Map(snapSecs.map(s=>[String(s.key||''),s]));
+  const byLabel=new Map(snapSecs.map(s=>[String(s.label||sectionDisplayName(s.key)||''),s]));
+  const seen=new Set();
+  return (typeof items!=='undefined'?items:[]).map(it=>{
+    const key=it[1], label=sectionDisplayName(key);
+    const src=byKey.get(String(key))||byLabel.get(String(label))||{key,label,text:'',folders:[]};
+    const fs=[];
+    for(const f of sharedItems){
+      const parts=String(f.folder_name||'').split(' / ').filter(Boolean);
+      const secLabel=parts[0]||'';
+      if(secLabel!==label && secLabel!==String(src.label||'')) continue;
+      const uniq=String(f.cloud_path||f.public_url||f.id||'')+'|'+String(f.file_name||'')+'|'+secLabel;
+      if(seen.has(uniq)) continue;
+      seen.add(uniq); fs.push(f);
+    }
+    return {...src,key,label,_files:fs};
+  });
+}
+v29SectionsWithContent=v30AllApprovalSections;
+openApprovalTargetModal=function(){
+ const box=document.getElementById('approvalTargetList'); const secs=v30AllApprovalSections();
+ box.innerHTML=secs.map((sec,idx)=>{
+   const files=sec._files||[];
+   const rows=files.map(f=>{const parts=String(f.folder_name||'').split(' / ').filter(Boolean);parts.shift();const folder=parts.join(' / ');return `<div class="approval-target-row"><div class="approval-target-name">📄 ${esc(f.file_name||'ملف')}${folder?`<small style="display:block;font-weight:400">📁 ${esc(folder)}</small>`:''}</div><div class="approval-target-actions"><button type="button" onclick='v29OpenFile(${JSON.stringify(f.public_url||'')})'>👁️ عرض</button><button class="approve" type="button" onclick='v29ChooseTarget("file",${JSON.stringify(sec.label)},${JSON.stringify(f.file_name||'ملف')},${JSON.stringify(folder)},${JSON.stringify(f.public_url||'')})'>✅ اعتماد الملف</button></div></div>`}).join('');
+   const has=String(sec.text||'').trim()||files.length||(sec.folders||[]).length;
+   return `<div class="approval-section-card"><h4>${arNums[idx]||idx+1}. 📂 ${esc(sec.label)}</h4>${sec.text?`<div class="viewer-note">${esc(String(sec.text).slice(0,240))}</div>`:''}${rows||(has?'<div class="approval-empty">لا توجد ملفات مباشرة في هذا القسم.</div>':'<div class="approval-empty">لا يوجد محتوى حاليًا.</div>')}<div class="approval-target-actions" style="margin-top:10px"><button class="approve" type="button" onclick='v29ChooseTarget("section",${JSON.stringify(sec.label)},"","","")'>✅ اعتماد القسم كاملًا</button></div></div>`;
+ }).join(''); openModal('approvalTargetModal');
+};
+const _v30ChooseTarget=v29ChooseTarget;
+v29ChooseTarget=function(kind,secLabel,fileName,folderName,url){
+ _v30ChooseTarget(kind,secLabel,fileName,folderName,url);
+ const status=document.getElementById('guestReviewStatus'); if(status)status.value='approved';
+ const help=document.getElementById('guestReviewHelp'); if(help){
+   const selected=help.querySelector('.approval-selected')?.outerHTML||'';
+   help.innerHTML=selected+(fileName&&url?`<button class="mini" type="button" onclick="v29OpenFile(approvalTarget.url)">👁️ عرض الملف قبل الاعتماد</button>`:'')+'<div class="viewer-note" style="margin-top:8px">راجعي العمل، ثم اكتبي اسمك وملاحظتك إن وجدت، ووقّعي بإصبعك داخل مربع التوقيع. الختم اختياري. بعدها اضغطي الزر الأخضر مرة واحدة.</div>';
+ }
+ const btn=document.querySelector('#guestReviewModal .modal-actions .action'); if(btn)btn.textContent='✅ اعتماد وتوقيع وإرسال للمعلمة';
+ const title=document.getElementById('guestReviewTitle'); if(title)title.textContent='🏫 المراجعة والاعتماد والتوقيع';
+};
+const _v30Submit=submitGuestReview;
+submitGuestReview=async function(){
+ if(sharedViewRole!=='admin')return _v30Submit.apply(this,arguments);
+ const status=document.getElementById('guestReviewStatus'); if(status)status.value='approved';
+ return _v30Submit.apply(this,arguments);
+};
+</script>
 </body>
 </html>
