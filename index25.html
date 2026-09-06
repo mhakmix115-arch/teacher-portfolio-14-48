@@ -4791,5 +4791,227 @@ function v31OpenApprovedPdf(dataUrl){const a=document.createElement('a');a.href=
 /* rename teacher card to the requested attention/notification area and hide legacy approval records */
 document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.special-card').forEach(c=>{if((c.textContent||'').includes('الاعتمادات والتوقيعات المستلمة')){const b=c.querySelector('b');if(b)b.textContent='🔔 الاهتمام والتنبيهات';const sp=c.querySelector('span');if(sp)sp.textContent='إشعار باسم الملف والقسم عند وصول اعتماد جديد';}})});
 </script>
+
+<style id="v32-click-fix-style">
+#approvalPdfViewerModal .modal-card{width:min(96vw,980px);height:min(92vh,900px);display:flex;flex-direction:column}
+#approvalPdfViewerFrame{width:100%;flex:1;min-height:68vh;border:1px solid #d8c48e;border-radius:14px;background:#fff}
+.approval-click-actions{display:flex;gap:8px;flex-wrap:wrap}
+.approval-click-actions button{border:1px solid #c9a84f;border-radius:12px;padding:8px 11px;background:#fff;color:#075b45;font-weight:800}
+.approval-click-actions .approve{background:#075b45;color:#fff}
+</style>
+<div class="modal" id="approvalPdfViewerModal"><div class="modal-card">
+  <div class="modal-head"><h3 id="approvalPdfViewerTitle">📄 عرض الملف</h3><button class="back" type="button" id="approvalPdfViewerClose">إغلاق</button></div>
+  <iframe id="approvalPdfViewerFrame" title="عرض ملف PDF"></iframe>
+  <div class="modal-actions"><button class="action secondary" type="button" id="approvalPdfViewerBack">العودة لقائمة الاعتماد</button></div>
+</div></div>
+<script id="v32-click-fix-script">
+/* v32: reliable iPhone/iPad click flow for viewing and approving shared PDFs. */
+let v32ApprovalRows=[];
+function v32ShowPdf(url,title){
+  if(!url){toast('تعذر فتح الملف');return;}
+  const frame=document.getElementById('approvalPdfViewerFrame');
+  const t=document.getElementById('approvalPdfViewerTitle');
+  if(t)t.textContent='📄 '+(title||'عرض الملف');
+  if(frame)frame.src=url;
+  openModal('approvalPdfViewerModal');
+}
+function v32ClosePdf(){
+  const frame=document.getElementById('approvalPdfViewerFrame');if(frame)frame.src='about:blank';
+  closeModal('approvalPdfViewerModal');
+}
+document.getElementById('approvalPdfViewerClose')?.addEventListener('click',v32ClosePdf);
+document.getElementById('approvalPdfViewerBack')?.addEventListener('click',()=>{v32ClosePdf();setTimeout(openApprovalTargetModal,80)});
+
+v29OpenFile=function(url,title){v32ShowPdf(url,title||approvalTarget?.file||'الملف')};
+
+openApprovalTargetModal=function(){
+  const box=document.getElementById('approvalTargetList');
+  const secs=v30AllApprovalSections();
+  v32ApprovalRows=[];
+  box.innerHTML=secs.map((sec,idx)=>{
+    const files=sec._files||[];
+    const rows=files.map(f=>{
+      const parts=String(f.folder_name||'').split(' / ').filter(Boolean);parts.shift();const folder=parts.join(' / ');
+      const i=v32ApprovalRows.push({section:sec.label,file:f.file_name||'ملف',folder,url:f.public_url||''})-1;
+      return `<div class="approval-target-row"><div class="approval-target-name">📄 ${esc(f.file_name||'ملف')}${folder?`<small style="display:block;font-weight:400">📁 ${esc(folder)}</small>`:''}</div><div class="approval-click-actions"><button type="button" data-v32-view="${i}">👁️ عرض الملف</button><button class="approve" type="button" data-v32-approve="${i}">✅ اعتماد الملف</button></div></div>`;
+    }).join('');
+    const has=String(sec.text||'').trim()||files.length||(sec.folders||[]).length;
+    return `<div class="approval-section-card"><h4>${arNums[idx]||idx+1}. 📂 ${esc(sec.label)}</h4>${sec.text?`<div class="viewer-note">${esc(String(sec.text).slice(0,240))}</div>`:''}${rows||(has?'<div class="approval-empty">لا توجد ملفات مباشرة في هذا القسم.</div>':'<div class="approval-empty">لا يوجد محتوى حاليًا.</div>')}</div>`;
+  }).join('');
+  box.querySelectorAll('[data-v32-view]').forEach(btn=>btn.addEventListener('click',()=>{
+    const r=v32ApprovalRows[Number(btn.dataset.v32View)];if(r)v32ShowPdf(r.url,r.file);
+  }));
+  box.querySelectorAll('[data-v32-approve]').forEach(btn=>btn.addEventListener('click',()=>{
+    const r=v32ApprovalRows[Number(btn.dataset.v32Approve)];if(!r)return;
+    approvalTarget={kind:'file',section:r.section,file:r.file,folder:r.folder||'',url:r.url||''};
+    closeModal('approvalTargetModal');
+    const title=document.getElementById('guestReviewTitle');if(title)title.textContent='🏫 توقيع وختم الملف نفسه';
+    const help=document.getElementById('guestReviewHelp');if(help)help.innerHTML=`<div class="approval-selected">القسم: ${esc(r.section)}<br>الملف: ${esc(r.file)}${r.folder?`<br>المجلد: ${esc(r.folder)}`:''}</div><button class="mini" type="button" id="v32ReviewSelected">👁️ عرض الملف قبل التوقيع</button><div class="viewer-note" style="margin-top:8px">راجعي الملف، ثم اكتبي اسمك ووقّعي بإصبعك. عند الإرسال يُنشأ PDF جديد عليه التوقيع والختم والاعتماد.</div>`;
+    document.getElementById('guestReviewMessage').innerHTML='';
+    openModal('guestReviewModal');setTimeout(()=>{setupGuestReviewSignature();document.getElementById('v32ReviewSelected')?.addEventListener('click',()=>v32ShowPdf(r.url,r.file));},80);
+    const submit=document.querySelector('#guestReviewModal .modal-actions .action');if(submit)submit.textContent='✅ توقيع وختم الملف وإرساله';
+  }));
+  openModal('approvalTargetModal');
+};
+</script>
+
+<style id="v33-final-approval-style">
+/* v33: اعتماد حقيقي على نفس PDF + رجوعه لنفس مكانه + تنبيه واضح */
+#approvalModal .form-grid,#approvalModal .modal-actions{display:none!important}
+#approvalModal #approvalScopeNote{display:none!important}
+#approvalModal h3{margin-bottom:10px}
+.v33-notice{border:1px solid #d7bd78;border-radius:16px;background:#fffdf7;padding:14px;margin:10px 0;color:#075b45;line-height:1.8}
+.v33-notice b{font-size:16px}.v33-notice .meta{font-size:12px;color:#6f6558}
+.v33-notice button{margin-top:8px;border:1px solid #c9a84f;border-radius:12px;background:#075b45;color:#fff;padding:8px 12px;font-weight:800}
+#guestReviewStatusWrap{display:none!important}
+.v33-approve-help{margin-top:8px;padding:10px 12px;border:1px dashed #d7bd78;border-radius:12px;background:#fffaf2;color:#075b45;line-height:1.7}
+</style>
+<script id="v33-final-approval-script">
+/*
+  v33 FINAL APPROVAL FLOW
+  - الإدارة تراجع ملف PDF الموجود نفسه.
+  - تحفظ فقط التوقيع/الختم + هوية الملف في الرد (بدون حشر PDF كامل داخل قاعدة البيانات).
+  - عند دخول المعلمة، يُنشأ PDF معتمد من الأصل السحابي، ويستبدل السجل في نفس القسم/المجلد.
+  - يظهر إشعار باسم الملف والقسم والمعتمدة والتاريخ.
+*/
+const V33_MARK='__TP_APPROVAL_V33__';
+const V33_DONE_KEY='v33_processed_approvals';
+function v33Done(){return new Set(getJSON(V33_DONE_KEY,[]))}
+function v33SaveDone(set){setJSON(V33_DONE_KEY,[...set])}
+function v33SectionKeyFromLabel(label){
+  const aliases=sectionAliases();
+  for(const row of items){const key=row[1];if(sectionDisplayName(key)===label||key===label)return key;}
+  for(const [k,v] of Object.entries(aliases)){if(v===label)return k;}
+  return label;
+}
+function v33ParseResponse(r){
+  const n=String(r?.note||'');if(!n.startsWith(V33_MARK))return null;
+  try{return JSON.parse(n.slice(V33_MARK.length))}catch(e){return null}
+}
+function v33OriginalRecord(sectionKey,folderName,fileName){
+  if(folderName){
+    const folders=getFolders(sectionKey)||[];
+    const folder=folders.find(f=>String(f.name||'')===String(folderName));
+    if(folder){const arr=getFolderFiles(folder.id,sectionKey)||[];const idx=arr.findIndex(f=>String(f.name||'')===String(fileName));if(idx>=0)return {arr,idx,folderId:folder.id,kind:'folder',file:arr[idx]};}
+  }
+  const arr=getRootFiles(sectionKey)||[];const idx=arr.findIndex(f=>String(f.name||'')===String(fileName));if(idx>=0)return {arr,idx,folderId:null,kind:'root',file:arr[idx]};
+  return null;
+}
+function v33DataUrlBytes(dataUrl){const b64=String(dataUrl||'').split(',')[1]||'';const bin=atob(b64);const out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out}
+async function v33SignedPdfBlob(originalBlob,signature,stamp){
+  if(!window.PDFLib)throw new Error('مكتبة PDF غير جاهزة.');
+  const bytes=new Uint8Array(await originalBlob.arrayBuffer());
+  const pdf=await PDFLib.PDFDocument.load(bytes,{ignoreEncryption:true});
+  const pages=pdf.getPages();if(!pages.length)throw new Error('ملف PDF لا يحتوي صفحات.');
+  const page=pages[pages.length-1];const {width,height}=page.getSize();
+  // نضع الاعتماد مباشرة على الصفحة الأخيرة بدون أي بطاقة أو إطار إضافي.
+  let y=22;
+  if(signature&&String(signature).startsWith('data:image/')){
+    const im=await pdf.embedPng(v33DataUrlBytes(signature));
+    const w=Math.min(width*0.30,170),h=Math.min(78,w*0.45);
+    page.drawImage(im,{x:Math.max(18,width-w-24),y,width:w,height:h});
+  }
+  if(stamp&&String(stamp).startsWith('data:image/')){
+    let im=null;try{im=String(stamp).includes('image/jpeg')?await pdf.embedJpg(v33DataUrlBytes(stamp)):await pdf.embedPng(v33DataUrlBytes(stamp));}catch(e){}
+    if(im){const w=Math.min(width*0.19,105);page.drawImage(im,{x:24,y,width:w,height:w});}
+  }
+  const out=await pdf.save();return new Blob([out],{type:'application/pdf'});
+}
+async function v33BlobForOriginal(rec,payload){
+  if(rec?.file?.cloud_path){const {data,error}=await sb.storage.from('shared-artifacts').download(rec.file.cloud_path);if(!error&&data)return data;}
+  if(rec?.file?.storage==='idb'&&rec.file.id){try{const b=await idbGetFile(rec.file.id);if(b)return b}catch(e){}}
+  if(payload?.url){const res=await fetch(payload.url);if(res.ok)return await res.blob();}
+  throw new Error('تعذر الوصول إلى أصل الملف لإنشاء النسخة المعتمدة.');
+}
+function v33ApprovedName(name){
+  const n=String(name||'ملف.pdf');return /\.pdf$/i.test(n)?n.replace(/\.pdf$/i,' - معتمد.pdf'):n+' - معتمد.pdf';
+}
+async function v33InstallApprovedResponse(r,payload){
+  const sectionKey=v33SectionKeyFromLabel(payload.section||'');
+  const rec=v33OriginalRecord(sectionKey,payload.folder||'',payload.file||'');
+  if(!rec)throw new Error('لم أجد الملف الأصلي في مكانه داخل ملف الإنجاز.');
+  const original=await v33BlobForOriginal(rec,payload);
+  const signedBlob=await v33SignedPdfBlob(original,r.signature_data||null,r.stamp_data||null);
+  const newId='approved_'+String(r.id||Date.now())+'_'+Math.random().toString(36).slice(2,7);
+  try{await idbPutFile(newId,signedBlob)}catch(e){console.warn('approved local cache',e)}
+  const approvedName=v33ApprovedName(payload.file);
+  const cloudPath=await uploadPortfolioBlobToCloud(newId,approvedName,'application/pdf',signedBlob);
+  if(!cloudPath)throw new Error(lastPortfolioCloudError||'تعذر حفظ الملف المعتمد في السحابة.');
+  const old=rec.file||{};
+  const meta={...old,id:newId,name:approvedName,type:'application/pdf',size:signedBlob.size,storage:'idb',cloud_path:cloudPath,cloud_ready:true,updatedAt:now(),approved:true,approved_response_id:String(r.id||''),approved_by:r.responder_name||'الإدارة',approved_at:r.created_at||new Date().toISOString(),original_name:payload.file,original_cloud_path:old.cloud_path||null};
+  // استبدال الأصل في الواجهة بنفس مكانه، مع إبقاء الأصل السحابي محفوظًا احتياطيًا وعدم حذفه.
+  rec.arr.splice(rec.idx,1,meta);
+  if(rec.kind==='folder')saveFolderFiles(rec.arr,rec.folderId,sectionKey);else saveRootFiles(rec.arr,sectionKey);
+  const notices=getJSON('v33_approval_notices',[]).filter(x=>String(x.response_id)!==String(r.id));
+  notices.unshift({response_id:String(r.id||''),file_name:approvedName,original_name:payload.file,section:payload.section,section_key:sectionKey,folder:payload.folder||'',approved_by:r.responder_name||'الإدارة',approved_at:r.created_at||new Date().toISOString(),file_id:newId});
+  setJSON('v33_approval_notices',notices.slice(0,200));
+  try{if(typeof schedulePortfolioCloudSave==='function')schedulePortfolioCloudSave()}catch(e){}
+  if(currentSection===sectionKey){try{renderRootFiles();renderFolders();if(currentFolderId)renderFolderFiles()}catch(e){}}
+}
+async function v33ProcessPendingApprovals(showToast=false){
+  if(sharedPortfolioToken)return 0;
+  const {data:{session}}=await sb.auth.getSession();if(!session)return 0;
+  const {data:links,error:le}=await sb.from('share_links').select('id').eq('owner_id',session.user.id);if(le)throw le;
+  const ids=(links||[]).map(x=>x.id);if(!ids.length)return 0;
+  const {data:rs,error:re}=await sb.from('share_responses').select('*').in('share_id',ids).eq('response_type','approval').order('created_at',{ascending:true});if(re)throw re;
+  const done=v33Done();let count=0;
+  for(const r of (rs||[])){
+    if(done.has(String(r.id)))continue;
+    const payload=v33ParseResponse(r);if(!payload)continue;
+    try{await v33InstallApprovedResponse(r,payload);done.add(String(r.id));v33SaveDone(done);count++;}catch(e){console.error('V33_APPROVAL_INSTALL',r.id,e);}
+  }
+  if(count&&showToast)toast('✅ تم استلام '+count+' ملف معتمد وإعادته لمكانه.');
+  return count;
+}
+function v33FindApprovedFile(notice){
+  const key=notice.section_key||v33SectionKeyFromLabel(notice.section||'');
+  if(notice.folder){const folder=(getFolders(key)||[]).find(f=>String(f.name||'')===String(notice.folder));if(folder){const f=(getFolderFiles(folder.id,key)||[]).find(x=>String(x.id)===String(notice.file_id)||String(x.approved_response_id)===String(notice.response_id));if(f)return f;}}
+  return (getRootFiles(key)||[]).find(x=>String(x.id)===String(notice.file_id)||String(x.approved_response_id)===String(notice.response_id))||null;
+}
+async function v33OpenNoticeFile(i){const n=getJSON('v33_approval_notices',[])[i];if(!n)return;const f=v33FindApprovedFile(n);if(!f)return toast('تعذر العثور على الملف المعتمد في مكانه.');await openFile(f)}
+openApprovals=async function(){
+  const feed=$('approvalFeed');const h=document.querySelector('#approvalModal h3');if(h)h.textContent='✅ الاعتمادات المستلمة';if(feed)feed.innerHTML='<div class="empty-state">جاري تحديث الاعتمادات…</div>';openModal('approvalModal');
+  try{await v33ProcessPendingApprovals(false);const notices=getJSON('v33_approval_notices',[]);if(!notices.length){feed.innerHTML='<div class="empty-state">لا توجد ملفات معتمدة بعد.</div>';return;}feed.innerHTML=notices.map((n,i)=>`<div class="v33-notice"><b>✅ تم اعتماد ملف: «${esc(n.original_name||n.file_name)}»</b><br>القسم: ${esc(n.section||'')} ${n.folder?'<br>المجلد: '+esc(n.folder):''}<br>المعتمدة: ${esc(n.approved_by||'الإدارة')}<div class="meta">${new Date(n.approved_at).toLocaleString('ar-SA')}</div><button type="button" onclick="v33OpenNoticeFile(${i})">📄 فتح الملف المعتمد</button></div>`).join('');}
+  catch(e){console.error(e);feed.innerHTML='<div class="empty-state">تعذر تحديث الاعتمادات الآن.</div>';}
+};
+// واجهة المديرة: اعتماد واحد فقط، بلا حالات متكررة.
+const _v33OldOpenApprovalTarget=openApprovalTargetModal;
+openApprovalTargetModal=function(){_v33OldOpenApprovalTarget();const wrap=document.getElementById('guestReviewStatusWrap');if(wrap)wrap.style.display='none';};
+submitGuestReview=async function(){
+  if(sharedViewRole!=='admin')return _v29SubmitGuestReview?.apply(this,arguments);
+  const msg=document.getElementById('guestReviewMessage');
+  try{
+    if(!approvalTarget||approvalTarget.kind!=='file')throw new Error('اختاري ملف PDF المطلوب اعتماده.');
+    if(!/\.pdf$/i.test(approvalTarget.file||''))throw new Error('التوقيع المباشر متاح حاليًا لملفات PDF.');
+    const name=document.getElementById('guestReviewName').value.trim();if(!name)throw new Error('اكتبي اسم المديرة / المشرفة.');
+    const signature=document.getElementById('guestReviewSignature')?.toDataURL('image/png')||null;
+    const stamp=await guestReviewFileData();
+    const humanNote=document.getElementById('guestReviewNote').value.trim();
+    const payload={v:33,section:approvalTarget.section,file:approvalTarget.file,folder:approvalTarget.folder||'',url:approvalTarget.url||'',note:humanNote,approved_at:new Date().toISOString()};
+    msg.innerHTML='<div class="us-ok">⏳ جاري إرسال التوقيع والختم وربطهما بهذا الملف…</div>';
+    const {error}=await sb.rpc('submit_share_response',{p_token:sharedPortfolioToken,p_type:'approval',p_name:name,p_status:'approved',p_note:V33_MARK+JSON.stringify(payload),p_signature:signature,p_stamp:stamp});if(error)throw error;
+    msg.innerHTML='<div class="us-ok">✅ تم اعتماد الملف. عند فتح المعلمة لملف الإنجاز سيعود نفس المستند إلى نفس القسم والمجلد وهو موقّع ومختوم.</div>';
+    const btn=document.querySelector('#guestReviewModal .modal-actions .action');if(btn)btn.disabled=true;
+  }catch(e){console.error(e);msg.innerHTML='<div class="us-err">❌ '+esc(e.message||'تعذر اعتماد الملف')+'</div>';}
+};
+// فتح PDF داخل الموقع على iPhone/iPad عبر Blob بدل الاعتماد على نافذة خارجية.
+let v33ViewerObjectUrl='';
+v32ShowPdf=async function(url,title){
+  if(!url)return toast('تعذر فتح الملف');
+  const frame=document.getElementById('approvalPdfViewerFrame'),t=document.getElementById('approvalPdfViewerTitle');if(t)t.textContent='📄 '+(title||'عرض الملف');
+  openModal('approvalPdfViewerModal');if(frame)frame.src='about:blank';
+  try{const res=await fetch(url);if(!res.ok)throw new Error('تعذر تحميل الملف');const blob=await res.blob();if(v33ViewerObjectUrl)URL.revokeObjectURL(v33ViewerObjectUrl);v33ViewerObjectUrl=URL.createObjectURL(blob);if(frame)frame.src=v33ViewerObjectUrl;}
+  catch(e){console.error(e);toast('تعذر فتح الملف من رابط المشاركة.');}
+};
+const _v33ClosePdf=v32ClosePdf;
+v32ClosePdf=function(){try{_v33ClosePdf()}finally{if(v33ViewerObjectUrl){URL.revokeObjectURL(v33ViewerObjectUrl);v33ViewerObjectUrl='';}}};
+// تنظيف النصوص والأزرار القديمة التي سببت اللبس.
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('.special-card').forEach(c=>{const txt=c.textContent||'';if(txt.includes('الاعتمادات والتوقيعات المستلمة')||txt.includes('الاهتمام والتنبيهات')){const b=c.querySelector('b');if(b)b.textContent='✅ الاعتمادات المستلمة';const sp=c.querySelector('span');if(sp)sp.textContent='إشعار باسم الملف والقسم وفتح النسخة الموقعة والمختومة';}});
+  setTimeout(()=>v33ProcessPendingApprovals(true).catch(console.error),1800);
+});
+const _v33OpenPortfolio=openPortfolio;
+openPortfolio=function(){const r=_v33OpenPortfolio.apply(this,arguments);setTimeout(()=>v33ProcessPendingApprovals(true).catch(console.error),1200);return r;};
+</script>
 </body>
 </html>
