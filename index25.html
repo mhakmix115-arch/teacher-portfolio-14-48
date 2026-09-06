@@ -1365,14 +1365,36 @@ async function idbPutFile(id,blob){const db=await openFileDb();return new Promis
 async function idbGetFile(id){const db=await openFileDb();return new Promise((resolve,reject)=>{const tx=db.transaction(FILE_DB_STORE,'readonly'),r=tx.objectStore(FILE_DB_STORE).get(id);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}
 async function idbDeleteFile(id){try{const db=await openFileDb();return await new Promise((resolve,reject)=>{const tx=db.transaction(FILE_DB_STORE,'readwrite');tx.objectStore(FILE_DB_STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}catch(e){}}
 
+let lastPortfolioCloudError='';
+function cloudErrorText(e){
+  if(!e)return 'خطأ غير معروف';
+  const parts=[];
+  if(e.message)parts.push(e.message);
+  if(e.statusCode)parts.push('الحالة '+e.statusCode);
+  else if(e.status)parts.push('الحالة '+e.status);
+  if(e.error && e.error!==e.message)parts.push(String(e.error));
+  return parts.filter(Boolean).join(' — ')||String(e);
+}
+async function activeCloudSession(){
+  let r=await sb.auth.getSession();
+  if(r.error) throw r.error;
+  let session=r.data?.session||null;
+  if(!session){
+    try{
+      const refreshed=await sb.auth.refreshSession();
+      if(refreshed.error) throw refreshed.error;
+      session=refreshed.data?.session||null;
+    }catch(e){}
+  }
+  return session;
+}
 async function uploadPortfolioBlobToCloud(id,name,type,blob){
+  lastPortfolioCloudError='';
   try{
-    const {data:{session}}=await sb.auth.getSession();
-    if(!session)return null;
+    const session=await activeCloudSession();
+    if(!session)throw new Error('لا توجد جلسة Microsoft فعالة في هذا المتصفح. افتحي الملف من Safari وسجلي الدخول من زر الدخول ثم أعيدي المحاولة.');
 
-    // مسار جديد وفريد في كل مرة حتى يعمل مع سياسة INSERT الحالية بدون UPDATE.
     const path=`${session.user.id}/portfolio/${Date.now()}_${Math.random().toString(36).slice(2,8)}_${id}_${usSafeName(name||'file')}`;
-
     const {error}=await sb.storage.from('shared-artifacts').upload(path,blob,{
       contentType:type||blob.type||'application/octet-stream',
       upsert:false
@@ -1380,8 +1402,29 @@ async function uploadPortfolioBlobToCloud(id,name,type,blob){
     if(error)throw error;
     return path;
   }catch(e){
+    lastPortfolioCloudError=cloudErrorText(e);
     console.warn('PORTFOLIO_FILE_CLOUD_UPLOAD',e);
     return null;
+  }
+}
+
+async function testPortfolioCloudConnection(){
+  lastPortfolioCloudError='';
+  try{
+    const session=await activeCloudSession();
+    if(!session)return {ok:false,stage:'auth',message:'لا توجد جلسة Microsoft فعالة في هذا المتصفح.'};
+    const uid=session.user.id;
+    const testPath=`${uid}/diagnostics/test_${Date.now()}_${Math.random().toString(36).slice(2,7)}.txt`;
+    const blob=new Blob(['portfolio-cloud-test'],{type:'text/plain'});
+    const {error:upErr}=await sb.storage.from('shared-artifacts').upload(testPath,blob,{contentType:'text/plain',upsert:false});
+    if(upErr)throw upErr;
+    const {data:signed,error:signErr}=await sb.storage.from('shared-artifacts').createSignedUrl(testPath,60);
+    if(signErr || !signed?.signedUrl)throw signErr||new Error('تعذر إنشاء رابط عرض تجريبي');
+    try{await sb.storage.from('shared-artifacts').remove([testPath])}catch(e){}
+    return {ok:true,email:session.user.email||'',uid};
+  }catch(e){
+    lastPortfolioCloudError=cloudErrorText(e);
+    return {ok:false,stage:'storage',message:lastPortfolioCloudError};
   }
 }
 
@@ -2099,7 +2142,24 @@ async function surveySubmitPublic(){
 }
 window.addEventListener('DOMContentLoaded',()=>setTimeout(surveyLoadPublic,80));
 
-function cloudInfo(){alert('بما أن لديك حساب Microsoft، فهذا يساعدنا في مرحلة الدخول الحقيقي. الربط النهائي سيكون عبر Supabase للحفظ السحابي والصلاحيات، ثم إعداد تسجيل الدخول بواسطة Microsoft / Microsoft Entra إذا كان حسابك المؤسسي يسمح بذلك. هذه النسخة الحالية لا تسجل الدخول إلى Microsoft تلقائيًا بعد؛ تحتاج مرحلة إعداد آمنة تشمل مشروع Supabase وإعداد تطبيق Microsoft وربط عنوان الموقع. بعدها يمكن للمعلمة والإدارة والأسرة الدخول بحسابات منفصلة وتظهر الملفات والاعتمادات والاستبيانات بين الأجهزة.')}
+async function cloudInfo(){
+  try{
+    const session=await activeCloudSession();
+    if(!session){
+      alert('❌ السحابة غير متصلة في هذا المتصفح.\n\nالحل: افتحي الموقع في Safari ثم اضغطي «الدخول إلى ملف الإنجاز» وسجلي الدخول بحساب Microsoft. بعد الدخول افتحي «السحابة والحسابات» مرة أخرى.');
+      return;
+    }
+    const email=session.user?.email||'حساب Microsoft';
+    const test=await testPortfolioCloudConnection();
+    if(test.ok){
+      alert(`✅ حساب Microsoft متصل\n${email}\n\n✅ رفع الملفات إلى shared-artifacts يعمل\n✅ إنشاء رابط عرض يعمل\n\nالسحابة جاهزة للمشاركة.`);
+    }else{
+      alert(`✅ حساب Microsoft متصل\n${email}\n\n❌ فشل اختبار تخزين الملفات\n${test.message||'خطأ غير معروف'}\n\nهذه هي رسالة الخطأ الفعلية من Supabase.`);
+    }
+  }catch(e){
+    alert('❌ تعذر فحص السحابة\n'+cloudErrorText(e));
+  }
+}
 
 const sharedPortfolioToken = new URLSearchParams(window.location.search).get('portfolio_share');
 let sharedViewRole = 'family';
@@ -2801,14 +2861,14 @@ async function ensurePortfolioFileCloudReady(file){
       file.type||blob.type||'application/octet-stream',
       blob
     );
-    if(!path) return {ok:false,reason:'تعذر حفظ النسخة السحابية'};
+    if(!path) return {ok:false,reason:lastPortfolioCloudError||'تعذر حفظ النسخة السحابية'};
 
     file.cloud_path=path;
     file.cloud_ready=true;
     return {ok:true,path};
   }catch(e){
     console.warn('ensurePortfolioFileCloudReady',e);
-    return {ok:false,reason:'تعذر تجهيز الملف'};
+    return {ok:false,reason:cloudErrorText(e)||'تعذر تجهيز الملف'};
   }
 }
 
@@ -2917,6 +2977,13 @@ async function bulkRelinkOldFiles(){
   status.innerHTML='<div class="us-ok">⏳ جاري مطابقة الملفات مع الأقسام والمجلدات…</div>';
 
   try{
+    const cloudTest=await testPortfolioCloudConnection();
+    if(!cloudTest.ok){
+      status.innerHTML=`<div class="us-err">❌ لا يمكن رفع الملفات الآن.<br>${esc(cloudTest.message||'تعذر الاتصال بالسحابة')}<br><br>افتحي «☁️ السحابة والحسابات» لمعرفة حالة الاتصال.</div>`;
+      input.value='';
+      return;
+    }
+
     const refs=allPortfolioFileRefs();
     const byName=new Map();
 
@@ -2978,7 +3045,7 @@ async function bulkRelinkOldFiles(){
           }
         }catch(e){
           console.warn('bulkRelinkOldFiles',e);
-          failed.push(picked.name);
+          failed.push({name:picked.name,reason:cloudErrorText(e)||lastPortfolioCloudError||'تعذر الربط'});
         }
       }
     }
@@ -3002,7 +3069,7 @@ async function bulkRelinkOldFiles(){
       html+=`<div class="us-err" style="margin-top:8px">لم أجد مطابقة لهذه الملفات:<br>${notFound.slice(0,10).map(n=>'• '+esc(n)).join('<br>')}</div>`;
     }
     if(failed.length){
-      html+=`<div class="us-err" style="margin-top:8px">تعذر ربط ${failed.length} ملف. أعيدي اختيارها مرة أخرى.</div>`;
+      html+=`<div class="us-err" style="margin-top:8px">❌ تعذر ربط ${failed.length} ملف.<br>${failed.slice(0,6).map(x=>'• '+esc(x.name)+'<br><small>'+esc(x.reason)+'</small>').join('<br>')}</div>`;
     }
 
     status.innerHTML=html;
