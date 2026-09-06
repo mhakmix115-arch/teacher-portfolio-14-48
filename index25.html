@@ -4619,5 +4619,58 @@ openPortfolio=function(){
   return _v28OpenPortfolio.apply(this,arguments);
 };
 </script>
+
+<style id="approval-target-v29-style">
+.approval-section-card{border:1px solid #dfc98f;border-radius:16px;padding:12px;margin:10px 0;background:#fffdf8}
+.approval-section-card h4{margin:0 0 8px;color:#075b45;font-size:18px}
+.approval-target-row{display:flex;gap:8px;align-items:center;justify-content:space-between;border-top:1px dashed #e4d5ac;padding:9px 0;flex-wrap:wrap}
+.approval-target-row:first-of-type{border-top:0}.approval-target-name{font-weight:700;word-break:break-word;flex:1;min-width:180px}
+.approval-target-actions{display:flex;gap:6px;flex-wrap:wrap}.approval-target-actions button{border:1px solid #c9a84f;border-radius:12px;padding:7px 10px;background:#fff;color:#075b45;font-weight:700}
+.approval-target-actions .approve{background:#075b45;color:#fff}.approval-selected{padding:10px 12px;border-radius:12px;background:#eef8f3;border:1px solid #a9d7c5;color:#075b45;font-weight:800;margin:10px 0}
+</style>
+<div class="modal" id="approvalTargetModal"><div class="modal-card">
+ <div class="modal-head"><h3>🏫 اختيار العمل للاعتماد</h3><button class="back" type="button" onclick="closeModal('approvalTargetModal')">إغلاق</button></div>
+ <div class="viewer-note">اختاري القسم أولًا، ثم شاهدي ملفاته ومجلداته. يمكن اعتماد ملف محدد أو القسم كاملًا.</div>
+ <div id="approvalTargetList" style="margin-top:10px"></div>
+</div></div>
+<script id="approval-target-v29-script">
+let approvalTarget=null;
+function v29SectionsWithContent(){
+ const snap=fullPortfolioPublicData?.snapshot||{}; const secs=snap.sections||[]; const items=fullPortfolioPublicData?.items||snap.files||[];
+ return secs.map(sec=>{const label=sec.label||sectionDisplayName(sec.key);const fs=items.filter(f=>String(f.folder_name||'').split(' / ')[0]===label);const hasText=!!String(sec.text||'').trim();const hasFolders=(sec.folders||[]).length>0;return {...sec,label,_files:fs,_has:hasText||hasFolders||fs.length};}).filter(x=>x._has);
+}
+function v29OpenFile(url){if(!url)return toast('تعذر فتح الملف');window.open(url,'_blank','noopener');}
+function v29ChooseTarget(kind,secLabel,fileName,folderName,url){
+ approvalTarget={kind,section:secLabel,file:fileName||'',folder:folderName||'',url:url||''};
+ closeModal('approvalTargetModal');
+ const title=document.getElementById('guestReviewTitle');if(title)title.textContent=kind==='file'?'🏫 اعتماد ملف':'🏫 اعتماد القسم كاملًا';
+ const help=document.getElementById('guestReviewHelp');if(help)help.innerHTML=`<div class="approval-selected">القسم: ${esc(secLabel)}${fileName?`<br>الملف: ${esc(fileName)}`:''}${folderName?`<br>المجلد: ${esc(folderName)}`:''}</div>`+(fileName&&url?`<button class="mini" type="button" onclick="v29OpenFile(approvalTarget.url)">👁️ عرض الملف قبل الاعتماد</button>`:'')+'<br>بعد المراجعة اختاري القرار وأضيفي الملاحظة والتوقيع أو الختم.';
+ document.getElementById('guestReviewMessage').innerHTML='';openModal('guestReviewModal');setTimeout(setupGuestReviewSignature,50);
+}
+function openApprovalTargetModal(){
+ const box=document.getElementById('approvalTargetList');const secs=v29SectionsWithContent();
+ if(!secs.length){box.innerHTML='<div class="empty-state">لا توجد أعمال مرتبطة بهذه المشاركة.</div>';openModal('approvalTargetModal');return;}
+ box.innerHTML=secs.map(sec=>{
+   const files=sec._files||[];
+   const rows=files.map(f=>{const parts=String(f.folder_name||'').split(' / ').filter(Boolean);parts.shift();const folder=parts.join(' / ');return `<div class="approval-target-row"><div class="approval-target-name">📄 ${esc(f.file_name||'ملف')}${folder?`<small style="display:block;font-weight:400">📁 ${esc(folder)}</small>`:''}</div><div class="approval-target-actions"><button type="button" onclick='v29OpenFile(${JSON.stringify(f.public_url||'')})'>👁️ عرض</button><button class="approve" type="button" onclick='v29ChooseTarget("file",${JSON.stringify(sec.label)},${JSON.stringify(f.file_name||'ملف')},${JSON.stringify(folder)},${JSON.stringify(f.public_url||'')})'>✅ اعتماد هذا الملف</button></div></div>`}).join('');
+   return `<div class="approval-section-card"><h4>📂 ${esc(sec.label)}</h4>${sec.text?`<div class="viewer-note">${esc(String(sec.text).slice(0,240))}</div>`:''}${rows||'<div class="viewer-note">لا توجد ملفات مباشرة؛ يمكن مراجعة محتوى القسم من صفحة القسم.</div>'}<div class="approval-target-actions" style="margin-top:10px"><button class="approve" type="button" onclick='v29ChooseTarget("section",${JSON.stringify(sec.label)},"","","")'>✅ اعتماد القسم كاملًا</button></div></div>`;
+ }).join('');openModal('approvalTargetModal');
+}
+const _v29OpenGuestReviewModal=openGuestReviewModal;
+openGuestReviewModal=function(){if(sharedViewRole==='admin'){approvalTarget=null;openApprovalTargetModal();return;}return _v29OpenGuestReviewModal.apply(this,arguments)};
+const _v29SubmitGuestReview=submitGuestReview;
+submitGuestReview=async function(){
+ if(sharedViewRole!=='admin')return _v29SubmitGuestReview.apply(this,arguments);
+ const msg=document.getElementById('guestReviewMessage');
+ try{
+  if(!approvalTarget)throw new Error('اختاري القسم أو الملف المراد اعتماده أولًا.');
+  const token=sharedPortfolioToken,name=document.getElementById('guestReviewName').value.trim(),note=document.getElementById('guestReviewNote').value.trim();if(!name)throw new Error('اكتبي اسم المديرة / المشرفة.');
+  const signature=document.getElementById('guestReviewSignature')?.toDataURL('image/png')||null,stamp=await guestReviewFileData();
+  const target=`[الاعتماد على: ${approvalTarget.kind==='file'?'ملف':'قسم'} | القسم: ${approvalTarget.section}${approvalTarget.file?' | الملف: '+approvalTarget.file:''}${approvalTarget.folder?' | المجلد: '+approvalTarget.folder:''}]`;
+  const {error}=await sb.rpc('submit_share_response',{p_token:token,p_type:'approval',p_name:name,p_status:document.getElementById('guestReviewStatus').value,p_note:target+(note?'\n'+note:''),p_signature:signature,p_stamp:stamp});if(error)throw error;
+  msg.innerHTML='<div class="us-ok">✅ تم إرسال الاعتماد للمعلمة وربطه بالعمل المحدد.</div>';
+ }catch(e){console.error(e);msg.innerHTML='<div class="us-err">❌ '+esc(e.message||'تعذر الإرسال')+'</div>'}
+};
+</script>
 </body>
 </html>
