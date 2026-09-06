@@ -2704,7 +2704,11 @@ function unifiedShareClose(){
   setTimeout(()=>window.scrollTo(0,usPreviousScroll),0);
 }
 function usSafeName(name){
-  return String(name||'file').replace(/[^\w\u0600-\u06FF.\-]+/g,'_').slice(-120);
+  // Supabase Storage object keys must be URL-safe. Keep the Arabic/original
+  // filename only in metadata; the storage key itself uses ASCII only.
+  const s=String(name||'file');
+  const m=s.match(/\.([A-Za-z0-9]{1,12})$/);
+  return 'file'+(m?'.'+m[1].toLowerCase():'');
 }
 
 async function attachPortfolioFileToShare(file,shareId,days,folderName=''){
