@@ -4537,5 +4537,87 @@ function v27CleanHome(){
 }
 window.addEventListener('DOMContentLoaded',()=>setTimeout(v27CleanHome,40));
 </script>
+
+<style id="shared-same-layout-v28">
+/* النسخة المشتركة تعرض نفس هيكل ملف المعلمة، مع منع أي تعديل */
+body.public-view #portfolio{display:block!important}
+body.public-view #fullPortfolioPublicPage{display:none!important}
+body.public-view .specials{display:none!important}
+body.public-view #roleSection{display:none!important}
+body.public-view .home-btn{display:none!important}
+body.public-view .folders-toolbar,
+body.public-view .folder-tools,
+body.public-view .file-actions,
+body.public-view #rootFilesHint,
+body.public-view .manage-only,
+body.public-view .teacher-only,
+body.public-view .admin-only{display:none!important}
+body.public-view #guestReviewFab{display:block!important}
+body.public-view .editable-field{pointer-events:none!important}
+.shared-role-strip{margin:10px auto 18px;max-width:1050px;padding:12px 16px;border:1px solid #d7bd78;border-radius:16px;background:#fffaf0;color:#075b45;font-weight:800;text-align:center}
+</style>
+<script>
+/* v28: المشاركة الكاملة = نفس ترتيب ملف المعلمة، لا قائمة مسطحة */
+function v28ShowSharedMirror(data){
+  fullPortfolioPublicData=data;
+  sharedViewRole=(data?.snapshot?.viewer_role==='admin')?'admin':'family';
+  if((!data.items||!data.items.length)&&Array.isArray(data?.snapshot?.files)) data.items=data.snapshot.files;
+  fpHydrateMirror(data);
+
+  document.body.classList.add('public-view');
+  document.body.classList.remove('cover-open');
+  const cover=document.getElementById('cover'); if(cover) cover.style.display='none';
+  const fp=document.getElementById('fullPortfolioPublicPage'); if(fp) fp.classList.remove('active');
+  const portfolio=document.getElementById('portfolio'); if(portfolio) portfolio.style.display='block';
+
+  currentSection=null; currentFolderId=null;
+  renderCards(); renderSideNav(); applyRole();
+
+  let strip=document.getElementById('sharedRoleStrip');
+  if(!strip){
+    strip=document.createElement('div'); strip.id='sharedRoleStrip'; strip.className='shared-role-strip';
+    const anchor=document.querySelector('#portfolio .section-title, #portfolio h1, #portfolio .role-section, #portfolio .specials');
+    if(anchor?.parentNode) anchor.parentNode.insertBefore(strip,anchor); else portfolio?.prepend(strip);
+  }
+  strip.innerHTML=sharedViewRole==='admin'
+    ? '🏫 نسخة الإدارة / المشرفة — نفس ترتيب ملف الإنجاز • مشاهدة الملفات والأقسام ثم الاعتماد والتوقيع من الزر الأخضر أسفل الشاشة.'
+    : '👨‍👩‍👧 نسخة الأسرة / الزائرة — نفس ترتيب ملف الإنجاز • مشاهدة الأقسام والمحتوى وإرسال الرأي من الزر أسفل الشاشة.';
+
+  configureSharedPortfolioUI();
+  const fab=document.getElementById('guestReviewFab');
+  if(fab){fab.classList.remove('hidden');fab.textContent=sharedViewRole==='admin'?'🏫 اعتماد وتوقيع ملف الإنجاز':'💬 إرسال رأي للمعلمة';}
+  window.scrollTo(0,0);
+}
+
+loadFullPortfolioPublic=async function(){
+  const token=sharedPortfolioToken; if(!token)return;
+  try{
+    const {data,error}=await sb.rpc('resolve_share_link_v2',{p_token:token});
+    if(error) throw error;
+    if(!data?.valid||!data?.snapshot?.full_portfolio) throw new Error('الرابط غير صالح أو انتهت مدته.');
+    v28ShowSharedMirror(data);
+  }catch(e){
+    console.error(e);
+    document.body.classList.remove('cover-open');
+    const cover=document.getElementById('cover'); if(cover) cover.style.display='none';
+    const portfolio=document.getElementById('portfolio'); if(portfolio) portfolio.style.display='none';
+    const page=document.getElementById('fullPortfolioPublicPage'); if(page) page.classList.add('active');
+    document.getElementById('fppClosed')?.classList.remove('hidden');
+    document.getElementById('fppContent')?.classList.add('hidden');
+  }
+};
+
+/* لا نسمح لزر الدخول/الحساب بتغيير النسخة المشتركة */
+const _v28OpenPortfolio=openPortfolio;
+openPortfolio=function(){
+  if(sharedPortfolioToken){
+    const cover=document.getElementById('cover'); if(cover) cover.style.display='none';
+    const portfolio=document.getElementById('portfolio'); if(portfolio) portfolio.style.display='block';
+    document.body.classList.add('public-view');document.body.classList.remove('cover-open');
+    return;
+  }
+  return _v28OpenPortfolio.apply(this,arguments);
+};
+</script>
 </body>
 </html>
