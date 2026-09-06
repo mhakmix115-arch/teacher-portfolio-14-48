@@ -627,8 +627,10 @@ body.cover-open{overflow:hidden}
     <button class="special-card manage-only" onclick="openApprovals()"><b>✅ الاعتمادات والتوقيعات المستلمة</b><span>عرض ردود المديرة / المشرفة والتوقيع والختم</span></button>
     <button class="special-card manage-only" onclick="openSurveys()"><b>📊 الاستبيانات والنتائج</b><span>إنشاء • نشر • رابط وباركود • نتائج ورسوم بيانية</span></button>
     <button class="special-card manage-only" onclick="cloudInfo()"><b>☁️ السحابة والحسابات</b><span>Supabase + Microsoft • مزامنة وصلاحيات بين الأجهزة</span></button>
+    <button class="special-card teacher-only manage-only" type="button" onclick="openAllSharePrep()"><b>☁️ تجهيز جميع الأقسام للمشاركة</b><span>فحص وربط كل الملفات والمجلدات مرة واحدة • جاهزة للإرسال من أي جهاز</span></button>
+    <button class="special-card teacher-only manage-only" type="button" onclick="unifiedShareOpen()"><b>🔗 المشاركة بالباركود</b><span>الإدارة والأسرة • روابط خاصة • اعتماد وملاحظات</span></button>
     <button class="special-card teacher-only manage-only" type="button" onclick="openQuickInbox()"><b>📥 الوارد السريع</b><span>ملفات وصور مؤقتة • ثم نقلها للقسم أو المجلد المناسب</span></button>
-    <button class="special-card full-share-wide teacher-only manage-only" type="button" onclick="fullPortfolioShareOpen()"><b>🔗 مشاركة ملف الإنجاز الكامل</b><span>للإدارة أو الأسرة • جميع الأقسام ومحتواها • بدون إعادة رفع الملفات</span></button>
+    <button class="special-card full-share-wide teacher-only manage-only" type="button" onclick="fullPortfolioShareOpen()"><b>🏫 إرسال ملف الإنجاز كامل للمديرة</b><span>عرض فقط • فتح الملفات • اعتماد وتوقيع وختم بدون تعديل</span></button>
   </div>
 </section>
 
@@ -1555,7 +1557,7 @@ function addFilesFromFolderEditor(e){
 function addRootFiles(e){addFilesToStorage(e.target,{kind:'root',section:currentSection})}
 function addFolderFiles(e){if(!currentFolderId)return;addFilesToStorage(e.target,{kind:'folder',folderId:currentFolderId,section:currentSection})}
 
-function renderRootFiles(){const area=$('rootFiles');const a=getRootFiles();area.innerHTML='';if(!a.length){area.innerHTML='<div class="empty-state" style="grid-column:1/-1">لا توجد ملفات مضافة في هذا القسم.</div>';return}a.forEach(f=>area.appendChild(buildFileCard(f,{kind:'root'})));applyRole()}
+function renderRootFiles(){const area=$('rootFiles');const a=getRootFiles();area.innerHTML='';if(!a.length){area.innerHTML='<div class="empty-state" style="grid-column:1/-1">لا توجد ملفات عامة في هذا القسم.</div>';return}a.forEach(f=>area.appendChild(buildFileCard(f,{kind:'root'})));applyRole()}
 function renderFolderFiles(){
   if(!currentFolderId)return;const area=$('folderFiles');let a=[...getFolderFiles()];const q=($('fileSearch')?.value||'').trim().toLowerCase();if(q)a=a.filter(f=>(f.name||'').toLowerCase().includes(q));const sort=$('fileSort')?.value||'updated';a.sort((x,y)=>sort==='name'?(x.name||'').localeCompare(y.name||'','ar'):sort==='type'?(x.type||'').localeCompare(y.type||''):(y.updatedAt||y.createdAt||0)-(x.updatedAt||x.createdAt||0));area.classList.toggle('list-view',fileViewMode==='list');area.innerHTML='';if(!a.length){area.innerHTML='<div class="empty-state" style="grid-column:1/-1">المجلد فارغ. أضيفي صورًا أو فيديوهات أو مستندات.</div>';return}a.forEach(f=>area.appendChild(buildFileCard(f,{kind:'folder',folderId:currentFolderId})));applyRole()
 }
@@ -2270,10 +2272,11 @@ function applyRole(){
   }
 
 
-  // في وضع المشاهدة العامة لا تظهر أدوات المعلمة أو بطاقات الإدارة.
-  if(!isManageMode){
-    document.querySelectorAll('.specials').forEach(el=>el.classList.add('hidden'));
-  }
+  // في وضع المشاهدة العامة نظهر الأقسام السفلية كلها.
+  // التوصيات تبقى تفاعلية، والبقية تظهر للعرض فقط بدون صلاحيات إدارة.
+  document.querySelectorAll('.specials .special-card').forEach((el)=>{
+    if(!isManageMode) el.classList.remove('hidden');
+  });
 
   // أدوات التحرير الديناميكية تحمل class=teacher-only / admin-only،
   // لذلك يكفي تحديث إظهارها وإخفائها بدون إعادة رسم المجلدات أو الملفات.
@@ -2559,9 +2562,9 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(handleShareGuestLink,3
         <div class="us-field"><label>القسم</label><select id="usSection"><option value="البيانات الشخصية">1. البيانات الشخصية</option><option value="السيرة الذاتية">2. السيرة الذاتية</option><option value="الرؤية والرسالة">3. الرؤية والرسالة</option><option value="الأهداف">4. الأهداف</option><option value="الخطة السنوية">5. الخطة السنوية</option><option value="الوحدات التعليمية">6. الوحدات التعليمية</option><option value="التحضير">7. التحضير</option><option value="استراتيجيات التعليم">8. استراتيجيات التعليم</option><option value="إنجازات الأطفال">9. إنجازات الأطفال</option><option value="ملاحظات الأطفال">10. ملاحظات الأطفال</option><option value="التوجيه الصحي">11. التوجيه الصحي</option><option value="الاستبيانات">12. الاستبيانات</option><option value="التقويم الذاتي">13. التقويم الذاتي</option><option value="التقويم الخارجي">14. التقويم الخارجي</option><option value="الأداء الوظيفي">15. الأداء الوظيفي</option><option value="ملفات وشواهد">16. ملفات وشواهد</option><option value="الدورات التدريبية">17. الدورات التدريبية</option><option value="الشهادات">18. الشهادات</option><option value="الفيديوهات">19. الفيديوهات</option><option value="الصور">20. الصور</option><option value="الشراكة المجتمعية">21. الشراكة المجتمعية</option><option value="ملاحظات الإدارة">22. ملاحظات الإدارة</option><option value="ملاحظات الأسرة">23. ملاحظات الأسرة</option><option value="صورتي وشهاداتي">24. صورتي وشهاداتي</option></select></div>
         <div class="us-field"><label>نوع الدخول</label><select id="usRole"><option value="admin">🏫 الإدارة / المشرفة — اعتماد وتوقيع</option><option value="family">👨‍👩‍👧 الأسرة / الزائرة — مشاهدة وتوصية</option></select></div>
         <div class="us-field"><label>مدة الرابط</label><select id="usDays"><option value="1">يوم واحد</option><option value="3">3 أيام</option><option value="7" selected>7 أيام</option><option value="14">14 يومًا</option><option value="30">30 يومًا</option></select></div>
-        <div class="us-field"><label>إرفاق ملفات للمراجعة</label><input id="usFilesInput" type="file" multiple></div>
+        <input id="usFilesInput" type="file" multiple style="display:none" aria-hidden="true">
       </div>
-      <div id="usExistingFilesHint" class="us-ok" style="margin-top:12px">سيتم إرفاق الملفات الموجودة داخل القسم تلقائيًا، ويمكنك أيضًا إضافة ملفات أخرى من الجهاز.</div>
+      <div id="usExistingFilesHint" class="us-ok" style="margin-top:12px">سيتم إرسال الملفات الموجودة أصلًا داخل القسم تلقائيًا — لا حاجة لإعادة رفعها.</div>
 <div class="us-field" style="margin-top:12px"><label>ملاحظة للزائر (اختياري)</label><textarea id="usNote" placeholder="مثال: يرجى مراجعة الملف والاطلاع على محتواه ثم اعتماده."></textarea></div>
       <div class="us-actions"><button class="action" type="button" onclick="unifiedCreateShare()">إنشاء الرابط والباركود</button></div>
       <div id="usStatus"></div>
@@ -2820,19 +2823,6 @@ async function unifiedCreateShare(){
       else failed.push({name:item.file?.name||'ملف',folder:item.folder||'',reason:r.reason});
     }
 
-    // الملفات المختارة من الجهاز مباشرة في نافذة المشاركة
-    const extra=[...(document.getElementById('usFiles')?.files||[])];
-    for(const f of extra){
-      const id='share_extra_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-      const blob=f.slice(0,f.size,f.type||'application/octet-stream');
-      await idbPutFile(id,blob);
-      const temp={id,name:f.name,type:f.type||'application/octet-stream',size:f.size,storage:'idb'};
-      const r=await ensurePortfolioFileCloudReady(temp);
-      if(r.ok){
-        const add=await signedShareItemFromCloud(temp,shareId,days,'');
-        if(add.ok) uploaded++; else failed.push({name:f.name,reason:add.reason});
-      }else failed.push({name:f.name,reason:r.reason});
-    }
 
     if(failed.length){
       usStatus(shareProblemsHtml(failed),true,true);
@@ -2841,7 +2831,9 @@ async function unifiedCreateShare(){
 
     usShareUrl=`${location.origin}${location.pathname}?share=${encodeURIComponent(token)}`;
     document.getElementById('usUrl').textContent=usShareUrl;
-    document.getElementById('usShareBox').classList.remove('hidden');
+    document.getElementById('usUrl')?.classList.remove('hidden');
+    document.getElementById('usCopyBtn')?.classList.remove('hidden');
+    document.getElementById('usSendBtn')?.classList.remove('hidden');
     const qr=document.getElementById('usQr');qr.innerHTML='';
     if(window.QRCode)new QRCode(qr,{text:usShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
 
@@ -3415,7 +3407,7 @@ async function createFullPortfolioShare(){
     qr.innerHTML='';
     if(window.QRCode)new QRCode(qr,{text:fullPortfolioShareUrl,width:190,height:190,correctLevel:QRCode.CorrectLevel.M});
 
-    status.innerHTML=`<div class="us-ok">✅ جاهز للإرسال. تم إرفاق ${uploaded} من ${uploaded} ملف بنجاح.</div>`;
+    status.innerHTML=`<div class="us-ok">✅ جاهز للإرسال. تم إرفاق ${uploaded} ملف من محتوى ملف الإنجاز، بدون إعادة رفع.</div>`;
     if(btn){btn.disabled=false;btn.textContent='إنشاء رابط جديد';}
   }catch(e){
     console.error(e);
@@ -4077,11 +4069,11 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
 <!-- مشاركة ملف الإنجاز كاملًا للاطلاع فقط -->
 <div class="modal" id="fullPortfolioShareModal"><div class="modal-card survey-pro-card">
   <div class="modal-head">
-    <h3>🔗 مشاركة ملف الإنجاز الكامل</h3>
+    <h3>👁️ مشاركة ملف الإنجاز كامل للاطلاع</h3>
     <button class="back" type="button" onclick="closeModal('fullPortfolioShareModal')">إغلاق</button>
   </div>
   <div class="viewer-note">
-    يرسل نفس ملف الإنجاز الموجود لديك: جميع الأقسام والمجلدات والملفات. الإدارة تستطيع الاعتماد والتوقيع، والأسرة تستطيع الاطلاع وإضافة الرأي. لا إعادة رفع للملفات.
+    ينشئ رابطًا للعرض فقط: الغلاف + جميع الأقسام + المجلدات + الملفات. الزائر لا يستطيع التعديل أو الحذف أو الرفع.
   </div>
   <div class="form-grid" style="margin-top:12px">
     <div class="field">
@@ -4089,6 +4081,7 @@ window.addEventListener('DOMContentLoaded',()=>setTimeout(unifiedLoadGuest,60));
       <select id="fpsRole">
         <option value="admin">الإدارة / المشرفة</option>
         <option value="family">الأسرة / الزائرة</option>
+        <option value="viewer">اطلاع فقط</option>
       </select>
     </div>
     <div class="field">
@@ -4316,12 +4309,32 @@ function configureSharedPortfolioUI(){
 }
 loadFullPortfolioPublic=async function(){
   const token=sharedPortfolioToken;if(!token)return;
-  try{const {data,error}=await sb.rpc('resolve_share_link_v2',{p_token:token});if(error)throw error;if(!data?.valid||!data.snapshot?.full_portfolio)throw new Error('الرابط غير صالح أو انتهت مدته.');
-    fullPortfolioPublicData=data;sharedViewRole=data.snapshot?.viewer_role==='admin'?'admin':'family';fpHydrateMirror(data);
-    document.getElementById('cover').style.display='none';document.getElementById('portfolio').style.display='block';document.getElementById('fullPortfolioPublicPage')?.classList.remove('active');document.body.classList.remove('cover-open');
-    renderCards();renderSideNav();applyRole();configureSharedPortfolioUI();window.scrollTo(0,0);
-  }catch(e){console.error(e);document.getElementById('cover').style.display='none';document.getElementById('portfolio').style.display='none';document.getElementById('fullPortfolioPublicPage').classList.add('active');document.getElementById('fppClosed').classList.remove('hidden');document.getElementById('fppContent').classList.add('hidden')}
-};
+  try{
+    const {data,error}=await sb.rpc('resolve_share_link_v2',{p_token:token});
+    if(error)throw error;
+    if(!data?.valid||!data.snapshot?.full_portfolio)throw new Error('الرابط غير صالح أو انتهت مدته.');
+    fullPortfolioPublicData=data;
+    sharedViewRole=data.snapshot?.viewer_role==='admin'?'admin':'family';
+    document.body.classList.add('public-view');
+    document.body.classList.remove('cover-open');
+    document.getElementById('cover').style.display='none';
+    document.getElementById('portfolio').style.display='none';
+    const page=document.getElementById('fullPortfolioPublicPage');
+    page?.classList.add('active');
+    document.getElementById('fppClosed')?.classList.add('hidden');
+    document.getElementById('fppContent')?.classList.remove('hidden');
+    fpRenderPublic(data);
+    configureSharedPortfolioUI();
+    window.scrollTo(0,0);
+  }catch(e){
+    console.error(e);
+    document.getElementById('cover').style.display='none';
+    document.getElementById('portfolio').style.display='none';
+    document.getElementById('fullPortfolioPublicPage')?.classList.add('active');
+    document.getElementById('fppClosed')?.classList.remove('hidden');
+    document.getElementById('fppContent')?.classList.add('hidden');
+  }
+}
 let guestReviewPadReady=false;
 function setupGuestReviewSignature(){const c=document.getElementById('guestReviewSignature');if(!c||guestReviewPadReady)return;guestReviewPadReady=true;const ctx=c.getContext('2d');ctx.lineWidth=5;ctx.lineCap='round';ctx.strokeStyle='#173d34';let drawing=false;const point=e=>{const r=c.getBoundingClientRect(),t=e.touches?.[0]||e;return{x:(t.clientX-r.left)*(c.width/r.width),y:(t.clientY-r.top)*(c.height/r.height)}};c.addEventListener('pointerdown',e=>{drawing=true;const p=point(e);ctx.beginPath();ctx.moveTo(p.x,p.y)});c.addEventListener('pointermove',e=>{if(!drawing)return;const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke()});window.addEventListener('pointerup',()=>drawing=false)}
 function clearGuestReviewSignature(){const c=document.getElementById('guestReviewSignature');if(c)c.getContext('2d').clearRect(0,0,c.width,c.height)}
