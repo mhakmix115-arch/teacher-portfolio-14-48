@@ -5381,5 +5381,64 @@ openApprovals=async function(){
 <script id="v37-approval-layout-script">
 window.__portfolioApprovalLayout='v37-footer-fixed';
 </script>
+
+<style id="v38-pdf-quality-signature-style">
+#portfolioPdfPages{padding:4px!important;background:#eeeae0!important}
+#portfolioPdfPages .v36-pdf-page{margin:0 auto 10px!important;border:0!important;box-shadow:0 1px 5px rgba(0,0,0,.16)!important}
+</style>
+<script id="v38-pdf-quality-signature-script">
+/* v38: sharper PDF preview + approval placed INSIDE the last PDF page at the bottom edge. */
+function v38ApprovalStrip(name){
+  const c=document.createElement('canvas');c.width=1200;c.height=140;const x=c.getContext('2d');
+  x.clearRect(0,0,c.width,c.height);x.fillStyle='rgba(255,255,255,.90)';x.fillRect(0,0,c.width,c.height);
+  x.strokeStyle='#0b6b50';x.lineWidth=4;x.beginPath();x.moveTo(0,4);x.lineTo(c.width,4);x.stroke();
+  x.fillStyle='#075b45';x.textAlign='right';x.direction='rtl';x.font='bold 42px Arial';x.fillText('معتمد وموقّع إلكترونيًا',1160,54);
+  x.font='32px Arial';x.fillText('المعتمدة: '+name,1160,101);
+  x.textAlign='left';x.direction='rtl';x.font='25px Arial';x.fillText(new Date().toLocaleString('ar-SA'),38,92);
+  return c.toDataURL('image/png');
+}
+async function v31MakeApprovedPdf(url,signature,stamp,name){
+  if(!window.PDFLib)throw new Error('تعذر تحميل أداة اعتماد PDF. أعيدي فتح الصفحة وحاولي مرة أخرى.');
+  const res=await fetch(url,{cache:'no-store'});if(!res.ok)throw new Error('تعذر فتح ملف PDF للاعتماد.');
+  const bytes=new Uint8Array(await res.arrayBuffer());
+  const pdf=await PDFLib.PDFDocument.load(bytes,{ignoreEncryption:true});
+  const pages=pdf.getPages();if(!pages.length)throw new Error('ملف PDF لا يحتوي صفحات.');
+  const page=pages[pages.length-1],{width,height}=page.getSize();
+  /* كل الاعتماد داخل حدود الصفحة نفسها، في أسفل الصفحة الأخيرة. */
+  const strip=await pdf.embedPng(v31DataUrlToBytes(v38ApprovalStrip(name)));
+  const bandH=Math.max(34,Math.min(52,height*.065));
+  page.drawImage(strip,{x:8,y:4,width:width-16,height:bandH});
+  if(signature){
+    const im=await pdf.embedPng(v31DataUrlToBytes(signature));
+    const sw=Math.min(width*.22,128),sh=Math.min(bandH-10,sw*.32);
+    page.drawImage(im,{x:14,y:8,width:sw,height:sh});
+  }
+  if(stamp&&String(stamp).startsWith('data:image/')){
+    let im=null;try{im=String(stamp).includes('image/jpeg')?await pdf.embedJpg(v31DataUrlToBytes(stamp)):await pdf.embedPng(v31DataUrlToBytes(stamp));}catch(e){}
+    if(im){const sz=Math.min(bandH-8,44);page.drawImage(im,{x:width-sz-14,y:8,width:sz,height:sz});}
+  }
+  return await pdf.save();
+}
+
+/* أوضح عرض ممكن على الجوال بدون تكبير الصفحة نفسها. */
+v36RenderPdf=async function(url){
+  const box=document.getElementById('portfolioPdfPages'),frame=document.getElementById('portfolioFileViewerFrame');
+  if(!box)return false;box.classList.add('show');if(frame)frame.classList.add('v36-hidden');
+  box.innerHTML='<div class="v36-loading">جاري تحميل جميع صفحات الملف بأعلى وضوح…</div>';
+  try{
+    const lib=await v36EnsurePdfJs(),bytes=await v36FetchBytes(url),doc=await lib.getDocument({data:bytes}).promise;v36PdfDoc=doc;box.innerHTML='';
+    const target=Math.max(320,Math.min(980,(box.clientWidth||window.innerWidth)-8));
+    const dpr=Math.min(3.5,Math.max(2.5,window.devicePixelRatio||1));
+    for(let i=1;i<=doc.numPages;i++){
+      const page=await doc.getPage(i),base=page.getViewport({scale:1}),cssScale=target/base.width,renderScale=cssScale*dpr,vp=page.getViewport({scale:renderScale});
+      const c=document.createElement('canvas');c.className='v36-pdf-page';c.width=Math.ceil(vp.width);c.height=Math.ceil(vp.height);c.style.width=target+'px';c.style.maxWidth='100%';c.style.height='auto';box.appendChild(c);
+      const ctx=c.getContext('2d',{alpha:false,desynchronized:true});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      await page.render({canvasContext:ctx,viewport:vp,intent:'display'}).promise;
+    }
+    box.scrollTop=0;return true;
+  }catch(e){console.error('v38 pdf',e);box.innerHTML='<div class="v36-error">تعذر عرض الملف داخل الصفحة. حاولي فتحه مرة أخرى.</div>';return false;}
+};
+window.__portfolioApprovalLayout='v38-inside-page-bottom';
+</script>
 </body>
 </html>
