@@ -5241,5 +5241,120 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 });
 </script>
+
+
+<style id="v36-pdf-approval-fix-style">
+/* v36: عرض جميع صفحات PDF + جعل التوقيع والختم ظاهرين + حذف اعتماد خاطئ */
+#portfolioFileViewerFrame.v36-hidden{display:none!important}
+#portfolioPdfPages{display:none;flex:1;min-height:65vh;overflow:auto;border:1px solid #d8c48e;border-radius:14px;background:#f3f1eb;padding:10px;box-sizing:border-box;-webkit-overflow-scrolling:touch}
+#portfolioPdfPages.show{display:block}
+#portfolioPdfPages .v36-pdf-page{display:block;margin:0 auto 12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12);max-width:100%;height:auto}
+#portfolioPdfPages .v36-loading,#portfolioPdfPages .v36-error{padding:28px 14px;text-align:center;font-weight:800;color:#075b45}
+#guestReviewSignatureWrap:not(.hidden),#guestReviewStampWrap:not(.hidden){display:block!important}
+#guestReviewSignature{width:100%!important;height:170px!important;display:block!important}
+.v36-stamp-box{margin-top:8px;padding:8px;border:1px dashed #c9a84f;border-radius:12px;background:#fff}
+.v36-delete-approval{background:#fff!important;color:#9b2f2f!important;border:1px solid #c98a8a!important;margin-inline-start:6px}
+</style>
+
+<script id="v36-pdf-approval-fix-script">
+(function(){
+  const frame=document.getElementById('portfolioFileViewerFrame');
+  if(frame && !document.getElementById('portfolioPdfPages')){
+    const pages=document.createElement('div');pages.id='portfolioPdfPages';
+    frame.parentNode.insertBefore(pages,frame.nextSibling);
+  }
+})();
+
+let v36PdfDoc=null;
+async function v36EnsurePdfJs(){
+  if(window.pdfjsLib)return window.pdfjsLib;
+  if(window.__v36PdfJsPromise)return window.__v36PdfJsPromise;
+  window.__v36PdfJsPromise=new Promise((resolve,reject)=>{
+    const sc=document.createElement('script');
+    sc.src='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+    sc.onload=()=>{try{pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';resolve(pdfjsLib)}catch(e){reject(e)}};
+    sc.onerror=()=>reject(new Error('تعذر تحميل عارض PDF.'));
+    document.head.appendChild(sc);
+  });
+  return window.__v36PdfJsPromise;
+}
+async function v36FetchBytes(url){
+  const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error('تعذر تحميل ملف PDF.');return new Uint8Array(await r.arrayBuffer());
+}
+async function v36RenderPdf(url){
+  const box=document.getElementById('portfolioPdfPages'),frame=document.getElementById('portfolioFileViewerFrame');
+  if(!box)return false;
+  box.classList.add('show');if(frame)frame.classList.add('v36-hidden');
+  box.innerHTML='<div class="v36-loading">جاري تحميل جميع صفحات الملف…</div>';
+  try{
+    const lib=await v36EnsurePdfJs();const bytes=await v36FetchBytes(url);
+    const doc=await lib.getDocument({data:bytes}).promise;v36PdfDoc=doc;box.innerHTML='';
+    const target=Math.max(280,Math.min(820,(box.clientWidth||window.innerWidth)-28));
+    for(let i=1;i<=doc.numPages;i++){
+      const page=await doc.getPage(i);const base=page.getViewport({scale:1});const scale=Math.min(2.2,target/base.width);const vp=page.getViewport({scale});
+      const c=document.createElement('canvas');c.className='v36-pdf-page';c.width=Math.floor(vp.width);c.height=Math.floor(vp.height);c.style.width=Math.min(target,vp.width)+'px';c.style.height='auto';box.appendChild(c);
+      await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+    }
+    box.scrollTop=0;return true;
+  }catch(e){console.error('v36 pdf',e);box.innerHTML='<div class="v36-error">تعذر عرض الملف داخل الصفحة. حاولي فتحه مرة أخرى.</div>';return false;}
+}
+
+const _v36OldShowViewer=v35ShowViewer;
+v35ShowViewer=async function(url,title,approvalRow=null,returnTo='portfolio'){
+  const modal=document.getElementById('portfolioFileViewerModal'),h=document.getElementById('portfolioFileViewerTitle'),approve=document.getElementById('portfolioFileViewerApprove'),frame=document.getElementById('portfolioFileViewerFrame'),box=document.getElementById('portfolioPdfPages');
+  if(!modal)return;
+  v35ViewerApprovalRow=approvalRow||null;v35ViewerReturn=returnTo||'portfolio';if(h)h.textContent='📄 '+(title||'عرض الملف');if(approve)approve.style.display=(sharedViewRole==='admin'&&approvalRow)?'inline-flex':'none';
+  if(frame){frame.src='about:blank';frame.classList.add('v36-hidden')}if(box){box.classList.add('show');box.innerHTML='<div class="v36-loading">جاري فتح الملف…</div>'}openModal('portfolioFileViewerModal');
+  const isPdf=/\.pdf(?:$|[?#])/i.test(String(title||''))||/\.pdf(?:$|[?#])/i.test(String(url||''));
+  if(isPdf){await v36RenderPdf(url);return;}
+  if(box){box.classList.remove('show');box.innerHTML=''}if(frame){frame.classList.remove('v36-hidden');frame.src=await v35ViewerSrc(url)}
+};
+const _v36OldClose=v35CloseViewer;
+v35CloseViewer=function(){const box=document.getElementById('portfolioPdfPages');if(box){box.innerHTML='';box.classList.remove('show')}v36PdfDoc=null;return _v36OldClose();};
+
+/* شاشة المديرة: أظهر حقول التوقيع والختم صراحة، ولا تعتمد على حالة نافذة سابقة */
+const _v36OpenAdmin=v35OpenAdminApproval;
+v35OpenAdminApproval=function(r){
+  _v36OpenAdmin(r);
+  const sig=document.getElementById('guestReviewSignatureWrap'),st=document.getElementById('guestReviewStampWrap');
+  sig?.classList.remove('hidden');st?.classList.remove('hidden');
+  const c=document.getElementById('guestReviewSignature');if(c){c.style.display='block';c.style.width='100%';c.style.height='170px'}
+  const inp=document.getElementById('guestReviewStamp');if(inp)inp.value='';
+  const im=document.getElementById('guestReviewStampPreview');if(im){im.classList.remove('show');im.removeAttribute('src')}
+  setTimeout(()=>{try{clearGuestReviewSignature();setupGuestReviewSignature()}catch(e){}},120);
+};
+
+/* حفظ معلومات الأصل حتى يمكن إلغاء اعتماد خاطئ */
+const _v36Install=v33InstallApprovedResponse;
+v33InstallApprovedResponse=async function(r,payload){
+  const key=v33SectionKeyFromLabel(payload.section||''),rec=v33OriginalRecord(key,payload.folder||'',payload.file||'');
+  const before=rec?.file?{id:rec.file.id,name:rec.file.name,type:rec.file.type,size:rec.file.size,storage:rec.file.storage,cloud_path:rec.file.cloud_path||null,cloud_ready:rec.file.cloud_ready}:null;
+  await _v36Install(r,payload);
+  const n=getJSON('v33_approval_notices',[]).find(x=>String(x.response_id)===String(r.id));const approved=n?v33FindApprovedFile(n):null;
+  if(approved&&before){approved.v36_original=before;const rr=v33OriginalRecord(key,payload.folder||'',approved.name||'');if(rr){rr.arr[rr.idx]=approved;if(rr.kind==='folder')saveFolderFiles(rr.arr,rr.folderId,key);else saveRootFiles(rr.arr,key)}}
+};
+
+async function v36DeleteApproval(i){
+  const notices=getJSON('v33_approval_notices',[]),n=notices[i];if(!n)return;
+  if(!confirm('حذف هذا الاعتماد وإرجاع الملف إلى النسخة الأصلية؟'))return;
+  const f=v33FindApprovedFile(n);if(!f){notices.splice(i,1);setJSON('v33_approval_notices',notices);openApprovals();return;}
+  const key=n.section_key||v33SectionKeyFromLabel(n.section||'');let rec=null;
+  if(n.folder){const folder=(getFolders(key)||[]).find(x=>String(x.name||'')===String(n.folder));if(folder){const arr=getFolderFiles(folder.id,key)||[],idx=arr.findIndex(x=>String(x.id)===String(f.id));if(idx>=0)rec={arr,idx,kind:'folder',folderId:folder.id}}}
+  if(!rec){const arr=getRootFiles(key)||[],idx=arr.findIndex(x=>String(x.id)===String(f.id));if(idx>=0)rec={arr,idx,kind:'root',folderId:null}}
+  if(!rec)return toast('تعذر العثور على الملف لإلغاء الاعتماد.');
+  const o=f.v36_original||null;const restored={...f,id:o?.id||('restored_'+Date.now()),name:n.original_name||f.original_name||String(f.name||'').replace(/ - معتمد(?=\.pdf$)/i,''),type:o?.type||'application/pdf',size:o?.size||f.size,storage:o?.storage||'idb',cloud_path:o?.cloud_path||f.original_cloud_path||null,cloud_ready:o?.cloud_ready!==false};
+  delete restored.approved;delete restored.approved_response_id;delete restored.approved_by;delete restored.approved_at;delete restored.original_name;delete restored.original_cloud_path;delete restored.v36_original;
+  rec.arr.splice(rec.idx,1,restored);if(rec.kind==='folder')saveFolderFiles(rec.arr,rec.folderId,key);else saveRootFiles(rec.arr,key);
+  if(f.cloud_path&&f.cloud_path!==restored.cloud_path){try{await sb.storage.from('shared-artifacts').remove([f.cloud_path])}catch(e){console.warn(e)}}
+  notices.splice(i,1);setJSON('v33_approval_notices',notices);try{schedulePortfolioCloudSave()}catch(e){}try{renderRootFiles();renderFolders();if(currentFolderId)renderFolderFiles()}catch(e){}
+  toast('تم حذف الاعتماد وإرجاع النسخة الأصلية.');openApprovals();
+}
+
+openApprovals=async function(){
+  const feed=$('approvalFeed'),h=document.querySelector('#approvalModal h3');if(h)h.textContent='✅ الاعتمادات المستلمة';if(feed)feed.innerHTML='<div class="empty-state">جاري تحديث الاعتمادات…</div>';openModal('approvalModal');
+  try{await v33ProcessPendingApprovals(false);const notices=getJSON('v33_approval_notices',[]);if(!notices.length){feed.innerHTML='<div class="empty-state">لا توجد ملفات معتمدة بعد.</div>';return;}feed.innerHTML=notices.map((n,i)=>`<div class="v33-notice"><b>✅ تم اعتماد ملف: «${esc(n.original_name||n.file_name)}»</b><br>القسم: ${esc(n.section||'')} ${n.folder?'<br>المجلد: '+esc(n.folder):''}<br>المعتمدة: ${esc(n.approved_by||'الإدارة')}<div class="meta">${new Date(n.approved_at).toLocaleString('ar-SA')}</div><button type="button" onclick="v33OpenNoticeFile(${i})">📄 فتح الملف المعتمد</button><button type="button" class="v36-delete-approval" onclick="v36DeleteApproval(${i})">🗑️ حذف الاعتماد</button></div>`).join('');}
+  catch(e){console.error(e);feed.innerHTML='<div class="empty-state">تعذر تحديث الاعتمادات الآن.</div>';}
+};
+</script>
 </body>
 </html>
