@@ -4759,7 +4759,7 @@ submitGuestReview=async function(){
   if(!approvalTarget)throw new Error('اختاري الملف المراد اعتماده أولًا.');
   if(approvalTarget.kind!=='file')throw new Error('للتوقيع والختم على المستند نفسه اختاري ملف PDF محددًا.');
   if(!/\.pdf$/i.test(approvalTarget.file||''))throw new Error('الاعتماد المباشر على المستند متاح حاليًا لملفات PDF.');
-  const name=document.getElementById('guestReviewName').value.trim();if(!name)throw new Error('اكتبي اسم المديرة / المشرفة.');
+  const name=document.getElementById('guestReviewName').value.trim();if(!name||name.length<3||!/[^\s.،,_-]/.test(name))throw new Error('اكتبي اسم المديرة / المشرفة كاملًا.');
   const note=document.getElementById('guestReviewNote').value.trim();
   const sigCanvas=document.getElementById('guestReviewSignature');const signature=sigCanvas?.toDataURL('image/png')||null;
   const stamp=await v31StampFileData();msg.innerHTML='<div class="us-ok">جاري وضع التوقيع والختم على ملف PDF نفسه…</div>';
@@ -4898,22 +4898,35 @@ function v33OriginalRecord(sectionKey,folderName,fileName){
   return null;
 }
 function v33DataUrlBytes(dataUrl){const b64=String(dataUrl||'').split(',')[1]||'';const bin=atob(b64);const out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out}
-async function v33SignedPdfBlob(originalBlob,signature,stamp){
+async function v33SignedPdfBlob(originalBlob,signature,stamp,approverName){
   if(!window.PDFLib)throw new Error('مكتبة PDF غير جاهزة.');
   const bytes=new Uint8Array(await originalBlob.arrayBuffer());
   const pdf=await PDFLib.PDFDocument.load(bytes,{ignoreEncryption:true});
   const pages=pdf.getPages();if(!pages.length)throw new Error('ملف PDF لا يحتوي صفحات.');
-  const page=pages[pages.length-1];const {width,height}=page.getSize();
-  // نضع الاعتماد مباشرة على الصفحة الأخيرة بدون أي بطاقة أو إطار إضافي.
-  let y=22;
+  const page=pages[pages.length-1];const originalSize=page.getSize();
+  const width=originalSize.width,height=originalSize.height;
+  // مساحة اعتماد ثابتة أسفل الصفحة الأخيرة حتى لا يقع التوقيع فوق نص المستند.
+  const footerH=Math.max(118,Math.min(150,width*0.24));
+  page.setSize(width,height+footerH);
+  try{page.translateContent(0,footerH)}catch(e){console.warn('translateContent',e)}
+  const {rgb}=PDFLib;
+  page.drawRectangle({x:0,y:0,width,height:footerH,color:rgb(1,1,1)});
+  page.drawLine({start:{x:20,y:footerH-4},end:{x:width-20,y:footerH-4},thickness:1,color:rgb(0.79,0.63,0.25)});
+  const cleanName=String(approverName||'الإدارة').trim()||'الإدارة';
+  // اسم المعتمدة يُرسم كصورة لدعم العربية بشكل صحيح.
+  try{
+    const label=await pdf.embedPng(v33DataUrlBytes(v31ApprovalLabel(cleanName)));
+    const lw=Math.min(width*0.42,250),lh=lw*(210/900);
+    page.drawImage(label,{x:(width-lw)/2,y:footerH-lh-12,width:lw,height:lh});
+  }catch(e){console.warn('approval name label',e)}
   if(signature&&String(signature).startsWith('data:image/')){
     const im=await pdf.embedPng(v33DataUrlBytes(signature));
-    const w=Math.min(width*0.30,170),h=Math.min(78,w*0.45);
-    page.drawImage(im,{x:Math.max(18,width-w-24),y,width:w,height:h});
+    const w=Math.min(width*0.26,145),h=Math.min(62,w*0.42);
+    page.drawImage(im,{x:width-w-26,y:18,width:w,height:h});
   }
   if(stamp&&String(stamp).startsWith('data:image/')){
     let im=null;try{im=String(stamp).includes('image/jpeg')?await pdf.embedJpg(v33DataUrlBytes(stamp)):await pdf.embedPng(v33DataUrlBytes(stamp));}catch(e){}
-    if(im){const w=Math.min(width*0.19,105);page.drawImage(im,{x:24,y,width:w,height:w});}
+    if(im){const w=Math.min(width*0.16,88);page.drawImage(im,{x:26,y:14,width:w,height:w});}
   }
   const out=await pdf.save();return new Blob([out],{type:'application/pdf'});
 }
@@ -4931,7 +4944,7 @@ async function v33InstallApprovedResponse(r,payload){
   const rec=v33OriginalRecord(sectionKey,payload.folder||'',payload.file||'');
   if(!rec)throw new Error('لم أجد الملف الأصلي في مكانه داخل ملف الإنجاز.');
   const original=await v33BlobForOriginal(rec,payload);
-  const signedBlob=await v33SignedPdfBlob(original,r.signature_data||null,r.stamp_data||null);
+  const signedBlob=await v33SignedPdfBlob(original,r.signature_data||null,r.stamp_data||null,r.responder_name||'الإدارة');
   const newId='approved_'+String(r.id||Date.now())+'_'+Math.random().toString(36).slice(2,7);
   try{await idbPutFile(newId,signedBlob)}catch(e){console.warn('approved local cache',e)}
   const approvedName=v33ApprovedName(payload.file);
@@ -5289,11 +5302,14 @@ async function v36RenderPdf(url){
   try{
     const lib=await v36EnsurePdfJs();const bytes=await v36FetchBytes(url);
     const doc=await lib.getDocument({data:bytes}).promise;v36PdfDoc=doc;box.innerHTML='';
-    const target=Math.max(280,Math.min(820,(box.clientWidth||window.innerWidth)-28));
+    const target=Math.max(300,Math.min(900,(box.clientWidth||window.innerWidth)-18));
+    const dpr=Math.min(2.25,Math.max(1,window.devicePixelRatio||1));
     for(let i=1;i<=doc.numPages;i++){
-      const page=await doc.getPage(i);const base=page.getViewport({scale:1});const scale=Math.min(2.2,target/base.width);const vp=page.getViewport({scale});
-      const c=document.createElement('canvas');c.className='v36-pdf-page';c.width=Math.floor(vp.width);c.height=Math.floor(vp.height);c.style.width=Math.min(target,vp.width)+'px';c.style.height='auto';box.appendChild(c);
-      await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+      const page=await doc.getPage(i);const base=page.getViewport({scale:1});
+      const cssScale=target/base.width;const renderScale=cssScale*dpr;const vp=page.getViewport({scale:renderScale});
+      const c=document.createElement('canvas');c.className='v36-pdf-page';c.width=Math.floor(vp.width);c.height=Math.floor(vp.height);c.style.width=target+'px';c.style.maxWidth='100%';c.style.height='auto';box.appendChild(c);
+      const ctx=c.getContext('2d',{alpha:false});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      await page.render({canvasContext:ctx,viewport:vp}).promise;
     }
     box.scrollTop=0;return true;
   }catch(e){console.error('v36 pdf',e);box.innerHTML='<div class="v36-error">تعذر عرض الملف داخل الصفحة. حاولي فتحه مرة أخرى.</div>';return false;}
@@ -5355,6 +5371,15 @@ openApprovals=async function(){
   try{await v33ProcessPendingApprovals(false);const notices=getJSON('v33_approval_notices',[]);if(!notices.length){feed.innerHTML='<div class="empty-state">لا توجد ملفات معتمدة بعد.</div>';return;}feed.innerHTML=notices.map((n,i)=>`<div class="v33-notice"><b>✅ تم اعتماد ملف: «${esc(n.original_name||n.file_name)}»</b><br>القسم: ${esc(n.section||'')} ${n.folder?'<br>المجلد: '+esc(n.folder):''}<br>المعتمدة: ${esc(n.approved_by||'الإدارة')}<div class="meta">${new Date(n.approved_at).toLocaleString('ar-SA')}</div><button type="button" onclick="v33OpenNoticeFile(${i})">📄 فتح الملف المعتمد</button><button type="button" class="v36-delete-approval" onclick="v36DeleteApproval(${i})">🗑️ حذف الاعتماد</button></div>`).join('');}
   catch(e){console.error(e);feed.innerHTML='<div class="empty-state">تعذر تحديث الاعتمادات الآن.</div>';}
 };
+</script>
+
+<style id="v37-approval-layout-style">
+#portfolioPdfPages{padding:8px!important;background:#f6f2e8!important}
+#portfolioPdfPages .v36-pdf-page{border:1px solid rgba(198,164,80,.22)}
+#guestReviewName{font-size:17px!important;font-weight:800!important}
+</style>
+<script id="v37-approval-layout-script">
+window.__portfolioApprovalLayout='v37-footer-fixed';
 </script>
 </body>
 </html>
