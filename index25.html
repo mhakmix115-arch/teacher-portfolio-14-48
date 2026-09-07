@@ -5087,5 +5087,159 @@ body.v34-busy .v34-modal-back,body.v34-busy .modal-actions button{pointer-events
  };
 })();
 </script>
+
+
+<style id="v35-final-ux-style">
+/* v35: فتح الملفات داخل ملف الإنجاز + مسار اعتماد مباشر وواضح */
+#portfolioFileViewerModal .modal-card{width:min(97vw,1050px);height:min(94vh,920px);display:flex;flex-direction:column;padding:14px}
+#portfolioFileViewerFrame{width:100%;flex:1;min-height:65vh;border:1px solid #d8c48e;border-radius:14px;background:#fff}
+.v35-viewer-top{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.v35-viewer-top button{border:1px solid #c9a84f;border-radius:999px;padding:9px 14px;background:#fff;color:#075b45;font-weight:900}
+.v35-viewer-top .approve{background:#075b45;color:#fff}
+#guestReviewModal .v35-sign-title{font-size:17px;font-weight:900;color:#075b45;margin:12px 0 6px}
+#guestReviewModal #guestReviewSignature{background:#fff;border:2px solid #c9a84f;border-radius:14px;touch-action:none;min-height:150px}
+#guestReviewStampPreview{display:none;margin-top:8px;max-width:150px;max-height:110px;object-fit:contain;border:1px solid #d8c48e;border-radius:10px;padding:5px;background:#fff}
+#guestReviewStampPreview.show{display:block}
+.v35-required{color:#a33;font-weight:800;font-size:12px}
+</style>
+
+<div class="modal" id="portfolioFileViewerModal"><div class="modal-card">
+  <div class="modal-head"><h3 id="portfolioFileViewerTitle">📄 عرض الملف</h3></div>
+  <div class="v35-viewer-top">
+    <button type="button" id="portfolioFileViewerBack">← العودة إلى ملف الإنجاز</button>
+    <button type="button" id="portfolioFileViewerApprove" class="approve" style="display:none">✅ اعتماد وتوقيع هذا الملف</button>
+  </div>
+  <iframe id="portfolioFileViewerFrame" title="عرض الملف"></iframe>
+</div></div>
+
+<script id="v35-final-ux-script">
+/* v35: one clear route: open -> return, and admin open -> sign/stamp -> approve */
+let v35ViewerObjectUrl='';
+let v35ViewerApprovalRow=null;
+let v35ViewerReturn='portfolio';
+
+function v35RevokeViewerUrl(){
+  if(v35ViewerObjectUrl){try{URL.revokeObjectURL(v35ViewerObjectUrl)}catch(e){}v35ViewerObjectUrl='';}
+}
+async function v35ViewerSrc(url){
+  if(!url) throw new Error('رابط الملف غير متاح.');
+  try{
+    const r=await fetch(url,{cache:'no-store'});
+    if(r.ok){const b=await r.blob();v35RevokeViewerUrl();v35ViewerObjectUrl=URL.createObjectURL(b);return v35ViewerObjectUrl;}
+  }catch(e){}
+  return url;
+}
+async function v35ShowViewer(url,title,approvalRow=null,returnTo='portfolio'){
+  const modal=document.getElementById('portfolioFileViewerModal');
+  const frame=document.getElementById('portfolioFileViewerFrame');
+  const h=document.getElementById('portfolioFileViewerTitle');
+  const approve=document.getElementById('portfolioFileViewerApprove');
+  if(!modal||!frame)return;
+  v35ViewerApprovalRow=approvalRow||null;v35ViewerReturn=returnTo||'portfolio';
+  if(h)h.textContent='📄 '+(title||'عرض الملف');
+  if(approve)approve.style.display=(sharedViewRole==='admin'&&approvalRow)?'inline-flex':'none';
+  frame.src='about:blank';openModal('portfolioFileViewerModal');
+  try{frame.src=await v35ViewerSrc(url);}catch(e){frame.src='about:blank';toast(e.message||'تعذر فتح الملف');}
+}
+function v35CloseViewer(){
+  const frame=document.getElementById('portfolioFileViewerFrame');if(frame)frame.src='about:blank';
+  v35RevokeViewerUrl();closeModal('portfolioFileViewerModal');
+}
+function v35ReturnFromViewer(){
+  const back=v35ViewerReturn;v35CloseViewer();
+  if(back==='approval')setTimeout(()=>openApprovalTargetModal(),80);
+  else if(back==='section')setTimeout(()=>{try{document.getElementById('sectionPanel')?.scrollIntoView({block:'start'})}catch(e){}},60);
+  else setTimeout(()=>{try{document.getElementById('portfolio')?.scrollIntoView({block:'start'})}catch(e){}},60);
+}
+document.getElementById('portfolioFileViewerBack')?.addEventListener('click',v35ReturnFromViewer);
+
+document.getElementById('portfolioFileViewerApprove')?.addEventListener('click',()=>{
+  const r=v35ViewerApprovalRow;if(!r)return;
+  v35CloseViewer();setTimeout(()=>v35OpenAdminApproval(r),80);
+});
+
+async function v35ResolveFileUrl(file){
+  if(file?.cloud_url)return file.cloud_url;
+  if(file?.cloud_path){const u=await signedPortfolioCloudUrl(file.cloud_path,3600);if(u)return u;}
+  if(file?.data)return file.data;
+  const blob=await idbGetFile(file?.id);if(blob){v35RevokeViewerUrl();v35ViewerObjectUrl=URL.createObjectURL(blob);return v35ViewerObjectUrl;}
+  throw new Error('تعذر فتح الملف.');
+}
+
+/* جميع ملفات المعلمة تُفتح داخل الموقع بدل صفحة خارجية بلا رجوع */
+openFile=async function(file){
+  try{
+    const url=await v35ResolveFileUrl(file);
+    await v35ShowViewer(url,file?.name||'الملف',null,'portfolio');
+  }catch(e){console.error(e);toast(e.message||'تعذر فتح الملف');}
+};
+
+/* أي معاينة عامة أيضًا داخل نافذة فيها رجوع واضح */
+fpViewSharedFile=function(url,type,name){v35ShowViewer(url,name||'الملف',null,'portfolio')};
+
+function v35OpenAdminApproval(r){
+  if(!r)return;
+  approvalTarget={kind:'file',section:r.section,file:r.file,folder:r.folder||'',url:r.url||''};
+  const title=document.getElementById('guestReviewTitle');if(title)title.textContent='🏫 توقيع وختم واعتماد الملف';
+  const help=document.getElementById('guestReviewHelp');if(help)help.innerHTML=`<div class="approval-selected">القسم: ${esc(r.section)}<br>الملف: ${esc(r.file)}${r.folder?`<br>المجلد: ${esc(r.folder)}`:''}</div><button class="mini" type="button" id="v35ReviewSelected">👁️ مراجعة الملف</button><div class="v35-approve-help">1) راجعي الملف &nbsp; 2) اكتبي اسمك &nbsp; 3) وقّعي داخل المربع &nbsp; 4) أضيفي صورة الختم إن رغبتِ &nbsp; 5) اضغطي اعتماد وإرسال.</div>`;
+  const sigWrap=document.getElementById('guestReviewSignatureWrap');if(sigWrap){const lab=sigWrap.querySelector('label');if(lab)lab.innerHTML='التوقيع على الملف <span class="v35-required">(مطلوب)</span>';}
+  const stampWrap=document.getElementById('guestReviewStampWrap');if(stampWrap){const lab=stampWrap.querySelector('label');if(lab)lab.textContent='الختم (صورة PNG/JPG - اختياري)';if(!document.getElementById('guestReviewStampPreview')){const im=document.createElement('img');im.id='guestReviewStampPreview';stampWrap.appendChild(im);}}
+  document.getElementById('guestReviewMessage').innerHTML='';
+  openModal('guestReviewModal');
+  setTimeout(()=>{
+    clearGuestReviewSignature();setupGuestReviewSignature();
+    document.getElementById('v35ReviewSelected')?.addEventListener('click',()=>v35ShowViewer(r.url,r.file,r,'approval'));
+    const submit=document.querySelector('#guestReviewModal .modal-actions .action');if(submit)submit.textContent='✅ اعتماد وتوقيع الملف وإرساله';
+  },80);
+}
+
+/* اجعل معاينة ملف قائمة الاعتماد نفسها تحتوي زر الاعتماد مباشرة */
+v32ShowPdf=function(url,title){
+  const r=(v32ApprovalRows||[]).find(x=>x.url===url) || (approvalTarget&&approvalTarget.url===url?approvalTarget:null);
+  const row=r?{section:r.section,file:r.file,folder:r.folder||'',url:r.url||url}:null;
+  v35ShowViewer(url,title||row?.file||'الملف',row,'approval');
+};
+v29OpenFile=function(url,title){v32ShowPdf(url,title||approvalTarget?.file||'الملف')};
+
+/* لو ضغطت المديرة زر اعتماد من القائمة: افتح شاشة التوقيع مباشرة */
+document.addEventListener('click',e=>{
+  const b=e.target.closest?.('[data-v32-approve]');if(!b)return;
+  const r=(v32ApprovalRows||[])[Number(b.dataset.v32Approve)];if(r){e.preventDefault();e.stopImmediatePropagation();v35OpenAdminApproval(r);}
+},true);
+
+function v35SignatureHasInk(){
+  const c=document.getElementById('guestReviewSignature');if(!c)return false;
+  try{const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;for(let i=3;i<d.length;i+=4)if(d[i]>8)return true;}catch(e){}
+  return false;
+}
+
+/* تحقق واضح: لا اعتماد بلا توقيع */
+const _v35SubmitGuestReview=submitGuestReview;
+submitGuestReview=async function(){
+  if(sharedViewRole==='admin'){
+    const msg=document.getElementById('guestReviewMessage');
+    if(!approvalTarget){if(msg)msg.innerHTML='<div class="us-err">❌ اختاري ملف PDF أولًا.</div>';return;}
+    if(!/\.pdf$/i.test(approvalTarget.file||'')){if(msg)msg.innerHTML='<div class="us-err">❌ الاعتماد بالتوقيع والختم متاح لملفات PDF.</div>';return;}
+    if(!v35SignatureHasInk()){if(msg)msg.innerHTML='<div class="us-err">❌ وقّعي داخل مربع التوقيع أولًا.</div>';return;}
+  }
+  return _v35SubmitGuestReview.apply(this,arguments);
+};
+
+/* معاينة الختم فور اختياره حتى تتأكد المديرة أنه ظهر */
+document.getElementById('guestReviewStamp')?.addEventListener('change',e=>{
+  const f=e.target.files?.[0],im=document.getElementById('guestReviewStampPreview');if(!im)return;
+  if(!f){im.classList.remove('show');im.removeAttribute('src');return;}
+  const r=new FileReader();r.onload=()=>{im.src=r.result;im.classList.add('show')};r.readAsDataURL(f);
+});
+
+/* زر رجوع صريح في شاشة توقيع المديرة */
+document.addEventListener('DOMContentLoaded',()=>{
+  const card=document.querySelector('#guestReviewModal .modal-card');
+  if(card&&!card.querySelector('.v35-back-approval')){
+    const b=document.createElement('button');b.type='button';b.className='v34-modal-back v35-back-approval';b.textContent='← العودة إلى الملفات';
+    b.addEventListener('click',()=>{closeModal('guestReviewModal');setTimeout(()=>openApprovalTargetModal(),80)});card.insertBefore(b,card.firstChild);
+  }
+});
+</script>
 </body>
 </html>
